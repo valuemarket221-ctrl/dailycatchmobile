@@ -1,0 +1,105 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IDE and Editor
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.vscode/settings.json
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter_generate_command*
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/.gradle/
+/android/key.properties
+/android/local.properties
+
+# iOS related
+/ios/Runner/GeneratedPluginRegistrant.m
+/ios/Runner/GeneratedPluginRegistrant.h
+/ios/.symlinks/
+/ios/Pods/
+
+# Web related
+/build/
+
+# Linux related
+/.cproject
+/.mtj.tmp/
+/*.mode
+*.moved
+*.orig
+*.rejected
+/linux/flutter/ephemeral/
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+
+# macOS related
+/. cocoaPods/**
+/macos/Flutter/ephemeral/
+/macos/Flutter/generated_plugin_registrant.cc
+/macos/Flutter/generated_plugin_registrant.h
+/macos/Flutter/generated_plugins.cmake
+/macos/Pods/
+
+# Windows related
+/windows/flutter/ephemeral/
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/windows/runner/CMakeLists.txt
+
+# Firebase configuration files (sensitive)
+**/firebase_options.dart
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Test files
+/coverage/
+
+# Temporary files that shouldn't be committed
+Get
+Process
+Run
+*.local
+
+# Misc
+*.localized
