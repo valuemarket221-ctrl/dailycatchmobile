@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/payment_api_service.dart';
 
 /// Écran de scan QR Code pour les partenaires
 /// Permet aux partenaires de scanner le QR code du client pour valider la récupération
 class QRScannerPage extends StatefulWidget {
-  const QRScannerPage({super.key});
+  const QRScannerPage({super.key, this.order = const {}});
+
+  final Map<String, dynamic> order;
 
   @override
   State<QRScannerPage> createState() => _QRScannerPageState();
@@ -15,30 +20,95 @@ class _QRScannerPageState extends State<QRScannerPage> {
   bool _hasScanned = false;
   String _scannedData = '';
   bool _isValid = false;
+  bool _isProcessing = false;
   String _validationMessage = '';
+  Map<String, dynamic> _validatedOrder = const {};
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
+  final PaymentApiService _paymentApiService = PaymentApiService();
 
-  // Simulation de validation
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
+
+  void _handleBarcodeCapture(BarcodeCapture capture) {
+    if (_hasScanned || _isProcessing) return;
+    final value = capture.barcodes.firstOrNull?.rawValue;
+    if (value == null || value.trim().isEmpty) return;
+    _validateQRCode(value);
+  }
+
   Future<void> _validateQRCode(String data) async {
+    _scannerController.stop();
     setState(() {
       _scannedData = data;
       _hasScanned = true;
+      _isProcessing = true;
     });
 
-    // Simulation de validation
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Vérifie le format du QR code
-    if (data.startsWith('RES') && data.contains('DailyCatch')) {
+    try {
+      final parsed = _parsePickupPayload(data);
+      await _paymentApiService.completePickup(
+        orderId: parsed.orderId,
+        pickupCode: parsed.pickupCode,
+      );
+      if (!mounted) return;
       setState(() {
         _isValid = true;
-        _validationMessage = 'Réservation validée avec succès!';
+        _isProcessing = false;
+        _validationMessage = 'Retrait validé côté serveur.';
+        _validatedOrder = {
+          ...widget.order,
+          'orderId': parsed.orderId,
+          'pickupCode': parsed.pickupCode,
+        };
       });
-    } else {
+    } on PaymentApiException catch (error) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
       setState(() {
         _isValid = false;
-        _validationMessage = 'QR code invalide ou expiré';
+        _isProcessing = false;
+        _validationMessage = _pickupErrorMessage(error);
+      });
+    } on FormatException {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      setState(() {
+        _isValid = false;
+        _isProcessing = false;
+        _validationMessage = 'Format du QR code invalide.';
+      });
+    } catch (_) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      setState(() {
+        _isValid = false;
+        _isProcessing = false;
+        _validationMessage = 'Validation impossible pour le moment.';
       });
     }
+  }
+
+  String _pickupErrorMessage(PaymentApiException error) {
+    if (error.statusCode == 403) {
+      return 'Compte non autorisé à valider un retrait.';
+    }
+    if (error.statusCode == 409) {
+      return 'Commande déjà retirée, annulée ou pas encore prête.';
+    }
+    if (error.message == 'invalid_pickup_code') {
+      return 'Code de retrait incorrect.';
+    }
+    if (error.message == 'order_not_found') {
+      return 'Commande introuvable.';
+    }
+    return 'QR code invalide, expiré ou backend indisponible.';
   }
 
   void _resetScanner() {
@@ -46,8 +116,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _hasScanned = false;
       _scannedData = '';
       _isValid = false;
+      _isProcessing = false;
       _validationMessage = '';
+      _validatedOrder = const {};
     });
+    _scannerController.start();
   }
 
   @override
@@ -65,7 +138,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
         foregroundColor: Colors.white,
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.flashlight_on), onPressed: () {}),
+          IconButton(
+            tooltip: 'Lampe',
+            icon: const Icon(Icons.flashlight_on),
+            onPressed: () => _scannerController.toggleTorch(),
+          ),
         ],
       ),
       body: Column(
@@ -73,14 +150,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
           // Instructions
           Container(
             padding: const EdgeInsets.all(16),
-            color: AppColors.blueBic.withOpacity(0.1),
+            color: AppColors.blueBic.withValues(alpha: 0.1),
             child: Row(
               children: [
                 const Icon(Icons.info, color: AppColors.blueBic),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Scannez le QR Code du client pour valider la récupération du produit',
+                    'Scannez le QR Code du client pour valider le retrait du panier',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: AppColors.blueBic,
@@ -95,7 +172,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
           Expanded(
             child: Stack(
               children: [
-                // Zone de scan simulée
                 Center(
                   child: Container(
                     margin: const EdgeInsets.all(32),
@@ -114,7 +190,16 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     child:
                         _hasScanned
                             ? _buildScanResult()
-                            : _buildScanPlaceholder(),
+                            : ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: MobileScanner(
+                                controller: _scannerController,
+                                onDetect: _handleBarcodeCapture,
+                                errorBuilder:
+                                    (context, error) =>
+                                        _buildCameraError(error),
+                              ),
+                            ),
                   ),
                 ),
 
@@ -136,40 +221,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
             child: Column(
               children: [
                 if (!_hasScanned) ...[
-                  // Bouton scanner simulation
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Simule un scan
-                      _validateQRCode('RES001|DailyCatch|4.50');
-                    },
-                    icon: const Icon(
-                      Icons.qr_code_scanner,
-                      color: Colors.black,
-                    ),
-                    label: Text(
-                      'Simuler un scan',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.yellowColor,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Text(
                     'Positionnez le QR Code dans le cadre',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed:
+                        () => context.go(
+                          '/partner/manual-code',
+                          extra: widget.order,
+                        ),
+                    child: Text(
+                      'Saisir le code manuellement',
+                      style: GoogleFonts.poppins(
+                        color: AppColors.blueBic,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ] else ...[
@@ -192,6 +263,36 @@ class _QRScannerPageState extends State<QRScannerPage> {
                       ),
                     ),
                   ),
+                  if (_isValid) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed:
+                            () => context.go(
+                              '/partner/pickup-validated',
+                              extra:
+                                  _validatedOrder.isEmpty
+                                      ? widget.order
+                                      : _validatedOrder,
+                            ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.blueBic,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Voir la confirmation',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -201,31 +302,35 @@ class _QRScannerPageState extends State<QRScannerPage> {
     );
   }
 
-  Widget _buildScanPlaceholder() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.qr_code_2,
-          size: 80,
-          color: AppColors.blueBic.withOpacity(0.3),
-        ),
-        const SizedBox(height: 16),
-        Icon(
-          Icons.center_focus_strong,
-          size: 40,
-          color: AppColors.blueBic.withOpacity(0.5),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Scan QR Code',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.blueBic,
+  Widget _buildCameraError(MobileScannerException error) {
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.no_photography_outlined,
+            color: Colors.white,
+            size: 48,
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          Text(
+            'Caméra indisponible',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Autorisez l’accès caméra pour scanner les QR codes.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+          ),
+        ],
+      ),
     );
   }
 
@@ -274,6 +379,30 @@ class _QRScannerPageState extends State<QRScannerPage> {
       ],
     );
   }
+
+  _PickupPayload _parsePickupPayload(String data) {
+    final normalized = data.trim();
+    final parts = normalized.split('|');
+    if (parts.length >= 2) {
+      return _PickupPayload(orderId: parts[0], pickupCode: parts[1]);
+    }
+    final uri = Uri.tryParse(normalized);
+    if (uri != null) {
+      final orderId = uri.queryParameters['orderId'];
+      final pickupCode = uri.queryParameters['pickupCode'];
+      if (orderId != null && pickupCode != null) {
+        return _PickupPayload(orderId: orderId, pickupCode: pickupCode);
+      }
+    }
+    throw FormatException('invalid_pickup_payload');
+  }
+}
+
+class _PickupPayload {
+  const _PickupPayload({required this.orderId, required this.pickupCode});
+
+  final String orderId;
+  final String pickupCode;
 }
 
 /// Painter pour le overlay de scan

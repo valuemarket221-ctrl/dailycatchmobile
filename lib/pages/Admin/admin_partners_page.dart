@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Partners Management Page - Clone TGTG Style
 /// Gestion des partenaires/commerces qui vendent leurs produits
@@ -15,6 +16,12 @@ class AdminPartnersPage extends StatefulWidget {
 class _AdminPartnersPageState extends State<AdminPartnersPage> {
   int _selectedTab = 0; // 0 = Tous, 1 = Actifs, 2 = En attente, 3 = Inactifs
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Mock data for partners
   final List<Map<String, dynamic>> _partners = [
@@ -122,11 +129,11 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
-        return Colors.green;
+        return AppColors.greenTGTG;
       case 'pending':
-        return Colors.orange;
+        return AppTheme.warningColor;
       case 'inactive':
-        return Colors.red;
+        return AppTheme.errorColor;
       default:
         return Colors.grey;
     }
@@ -148,19 +155,22 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
         title: Text(
-          'Partenaires',
-          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+          'Commerces',
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.blueBic,
+          ),
         ),
         leading: Builder(
           builder:
               (context) => IconButton(
-                icon: const Icon(Icons.menu, color: Colors.black),
+                icon: const Icon(Icons.menu, color: AppColors.blueBic),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
         ),
@@ -174,19 +184,24 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
       drawer: _buildDrawer(context),
       body: Column(
         children: [
+          _buildSummaryHeader(),
           // Search bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Rechercher un partenaire...',
+                hintText: 'Rechercher un commerce...',
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(color: AppTheme.softBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.softBorder),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
@@ -225,6 +240,61 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
     );
   }
 
+  Widget _buildSummaryHeader() {
+    final activeCount =
+        _partners.where((p) => p['status'] == 'active').length.toString();
+    final pendingCount =
+        _partners.where((p) => p['status'] == 'pending').length.toString();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.greenTGTG.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.storefront, color: AppColors.greenTGTG),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$activeCount commerces actifs',
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.blueBic,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$pendingCount demande en attente de validation.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTab(String label, int index) {
     final isSelected = _selectedTab == index;
     return GestureDetector(
@@ -233,15 +303,18 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.blueBic : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppColors.blueBic : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.blueBic : AppTheme.softBorder,
+          ),
         ),
         child: Text(
           label,
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Colors.black,
+            color: isSelected ? Colors.white : AppColors.blueBic,
           ),
         ),
       ),
@@ -257,18 +330,12 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: AppTheme.shadowSm,
           border: Border.all(
             color:
                 partner['status'] == 'pending'
-                    ? Colors.orange.withValues(alpha: 0.3)
-                    : Colors.transparent,
+                    ? AppTheme.warningColor.withValues(alpha: 0.35)
+                    : AppTheme.softBorder,
           ),
         ),
         child: Column(
@@ -308,6 +375,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                color: AppColors.blueBic,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -386,9 +454,9 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                   ),
                   const SizedBox(width: 24),
                   _buildMetric(
-                    Icons.euro,
+                    Icons.savings,
                     '${(partner['revenue'] as double).toStringAsFixed(0)}€',
-                    Colors.green,
+                    AppColors.greenTGTG,
                   ),
                 ],
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/payment_api_service.dart';
 
 class RateReviewPage extends StatefulWidget {
   const RateReviewPage({super.key});
@@ -14,10 +15,11 @@ class _RateReviewPageState extends State<RateReviewPage> {
   int _rating = 0;
   int _selectedAspect = -1;
   final TextEditingController _commentController = TextEditingController();
+  final PaymentApiService _paymentApiService = PaymentApiService();
 
   final List<Map<String, dynamic>> aspects = [
     {'icon': Icons.access_time, 'label': 'Respect de l\'horaire'},
-    {'icon': Icons.restaurant, 'label': 'Qualité des produits'},
+    {'icon': Icons.restaurant, 'label': 'Qualité du panier'},
     {'icon': Icons.person, 'label': 'Accueil'},
     {'icon': Icons.inventory_2, 'label': 'Emballage'},
   ];
@@ -127,12 +129,16 @@ class _RateReviewPageState extends State<RateReviewPage> {
                           size: 24,
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'Pourquoi évaluer ?',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                        Expanded(
+                          child: Text(
+                            'Pourquoi évaluer ?',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -386,18 +392,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Merci pour votre avis !',
-                              style: GoogleFonts.poppins(),
-                            ),
-                            backgroundColor: AppColors.greenTGTG,
-                          ),
-                        );
-                      },
+                      onPressed: () => _submitReview(order),
                       child: Text(
                         'Envoyer mon avis',
                         style: GoogleFonts.poppins(
@@ -414,6 +409,49 @@ class _RateReviewPageState extends State<RateReviewPage> {
             ),
           ),
     );
+  }
+
+  Future<void> _submitReview(Map<String, dynamic> order) async {
+    if (_rating == 0) return;
+
+    final aspect =
+        _selectedAspect >= 0 ? aspects[_selectedAspect]['label'] as String : '';
+    final comment = [
+      if (aspect.isNotEmpty) 'Aspect: $aspect',
+      if (_commentController.text.trim().isNotEmpty)
+        _commentController.text.trim(),
+    ].join('\n');
+
+    try {
+      await _paymentApiService.reviewOrder(
+        orderId: order['id'] as String,
+        rating: _rating,
+        comment: comment.isEmpty ? null : comment,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Merci pour votre avis !',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: AppColors.greenTGTG,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Avis non envoyé: le retrait doit être validé avant notation.',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   Widget _buildTip(String text) {

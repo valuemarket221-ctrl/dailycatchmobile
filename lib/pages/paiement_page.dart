@@ -12,7 +12,7 @@ class PaiementPage extends StatefulWidget {
 
 class _PaiementPageState extends State<PaiementPage> {
   String? selectedPaymentMethod;
-  final TextEditingController addressController = TextEditingController();
+  final TextEditingController pickupNoteController = TextEditingController();
 
   final List<Map<String, dynamic>> paymentMethods = [
     {
@@ -42,6 +42,12 @@ class _PaiementPageState extends State<PaiementPage> {
   ];
 
   @override
+  void dispose() {
+    pickupNoteController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -68,9 +74,9 @@ class _PaiementPageState extends State<PaiementPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Adresse de livraison
+              // Point de retrait
               Text(
-                'Adresse de livraison',
+                'Point de retrait',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -79,9 +85,9 @@ class _PaiementPageState extends State<PaiementPage> {
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: addressController,
+                controller: pickupNoteController,
                 decoration: InputDecoration(
-                  hintText: 'Entrez votre adresse de livraison',
+                  hintText: 'Confirmez le commerce ou ajoutez une note',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.grey[300]!),
@@ -114,7 +120,7 @@ class _PaiementPageState extends State<PaiementPage> {
 
               const SizedBox(height: 24),
 
-              // Récapitulatif de commande
+              // Récapitulatif de réservation
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -158,8 +164,8 @@ class _PaiementPageState extends State<PaiementPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _buildSummaryRow('Sacs magic Thon Rouge', '18.00 €'),
-                    _buildSummaryRow('Sacs magic Crevettes x2', '31.00 €'),
+                    _buildSummaryRow('Panier surprise Thon Rouge', '18.00 €'),
+                    _buildSummaryRow('Panier surprise Crevettes x2', '31.00 €'),
                     const Divider(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -207,7 +213,7 @@ class _PaiementPageState extends State<PaiementPage> {
 
               const SizedBox(height: 24),
 
-              // Info livraison
+              // Info retrait
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -217,7 +223,7 @@ class _PaiementPageState extends State<PaiementPage> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.delivery_dining,
+                      Icons.store_mall_directory,
                       color: AppColors.greenTGTG,
                       size: 28,
                     ),
@@ -227,7 +233,7 @@ class _PaiementPageState extends State<PaiementPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Livraison estimée',
+                            'Créneau de retrait',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -235,7 +241,7 @@ class _PaiementPageState extends State<PaiementPage> {
                             ),
                           ),
                           Text(
-                            '15-30 minutes',
+                            'Aujourd’hui, 18:00 - 19:30',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -264,9 +270,9 @@ class _PaiementPageState extends State<PaiementPage> {
                   ),
                   onPressed:
                       selectedPaymentMethod != null &&
-                              addressController.text.isNotEmpty
+                              pickupNoteController.text.isNotEmpty
                           ? () {
-                            // Logique de validation de commande
+                            // Logique de validation de réservation
                             showDialog(
                               context: context,
                               builder:
@@ -294,7 +300,7 @@ class _PaiementPageState extends State<PaiementPage> {
                                           ),
                                           const SizedBox(height: 24),
                                           Text(
-                                            'Commande validée !',
+                                            'Réservation confirmée !',
                                             style: GoogleFonts.poppins(
                                               fontSize: 22,
                                               fontWeight: FontWeight.bold,
@@ -303,7 +309,7 @@ class _PaiementPageState extends State<PaiementPage> {
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
-                                            'Votre commande a été enregistrée avec succès.',
+                                            'Votre panier est réservé. Présentez le QR code au commerce pendant le créneau de retrait.',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14,
                                               color: Colors.grey[600],
@@ -318,6 +324,7 @@ class _PaiementPageState extends State<PaiementPage> {
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor:
                                                     AppColors.greenTGTG,
+                                                foregroundColor: Colors.white,
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius:
                                                       BorderRadius.circular(12),
@@ -344,7 +351,7 @@ class _PaiementPageState extends State<PaiementPage> {
                           }
                           : null,
                   child: Text(
-                    'Valider la commande',
+                    'Réserver et payer',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -356,13 +363,13 @@ class _PaiementPageState extends State<PaiementPage> {
 
               // Warning si pas de paiement sélectionné
               if (selectedPaymentMethod == null ||
-                  addressController.text.isEmpty)
+                  pickupNoteController.text.isEmpty)
                 const SizedBox(height: 12),
               if (selectedPaymentMethod == null ||
-                  addressController.text.isEmpty)
+                  pickupNoteController.text.isEmpty)
                 Center(
                   child: Text(
-                    'Sélectionnez un mode de paiement et entrez une adresse',
+                    'Sélectionnez un mode de paiement et confirmez le retrait',
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       color: Colors.grey[500],
@@ -401,70 +408,72 @@ class _PaiementPageState extends State<PaiementPage> {
                 ]
                 : [],
       ),
-      child: RadioListTile(
-        value: method['title'],
+      child: RadioGroup<String>(
         groupValue: selectedPaymentMethod,
         onChanged: (value) {
           setState(() {
             selectedPaymentMethod = value;
           });
         },
-        activeColor: AppColors.greenTGTG,
-        controlAffinity: ListTileControlAffinity.trailing,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: (method['color'] as Color).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+        child: RadioListTile<String>(
+          value: method['title'] as String,
+          activeColor: AppColors.greenTGTG,
+          controlAffinity: ListTileControlAffinity.trailing,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (method['color'] as Color).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  method['icon'] as IconData,
+                  color: method['color'] as Color,
+                  size: 24,
+                ),
               ),
-              child: Icon(
-                method['icon'] as IconData,
-                color: method['color'] as Color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    method['title'] as String,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      method['title'] as String,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
                     ),
-                  ),
-                  Text(
-                    method['subtitle'] as String,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
+                    Text(
+                      method['subtitle'] as String,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        secondary: Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected ? AppColors.greenTGTG : Colors.grey[300]!,
-              width: 2,
-            ),
-            color: isSelected ? AppColors.greenTGTG : Colors.transparent,
+            ],
           ),
-          child:
-              isSelected
-                  ? const Icon(Icons.check, color: Colors.white, size: 14)
-                  : null,
+          secondary: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? AppColors.greenTGTG : Colors.grey[300]!,
+                width: 2,
+              ),
+              color: isSelected ? AppColors.greenTGTG : Colors.transparent,
+            ),
+            child:
+                isSelected
+                    ? const Icon(Icons.check, color: Colors.white, size: 14)
+                    : null,
+          ),
         ),
       ),
     );

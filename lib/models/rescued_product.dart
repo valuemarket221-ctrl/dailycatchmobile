@@ -1,3 +1,5 @@
+import 'package:myapp/models/product_offer.dart';
+
 /// Modèle de données pour un produit "sauvé" ( Too Good To Go )
 /// Représente un produit alimentaire rescued du gaspillage à prix réduit
 class RescuedProduct {
@@ -149,6 +151,58 @@ class RescuedProduct {
       category: map['category'] ?? '',
       distance: (map['distance'] ?? 0.0).toDouble(),
     );
+  }
+
+  factory RescuedProduct.fromOffer(ProductOffer offer) {
+    final now = DateTime.now();
+    final pickupStartTime = offer.pickupStartsAt ?? now;
+    final pickupEndTime =
+        offer.pickupEndsAt ?? pickupStartTime.add(const Duration(hours: 2));
+    final category = offer.category?.trim();
+    final originalPrice =
+        offer.originalPrice <= offer.price
+            ? offer.price * 2
+            : offer.originalPrice;
+
+    return RescuedProduct(
+      id: offer.id,
+      name: offer.name,
+      description:
+          offer.description?.trim().isNotEmpty == true
+              ? offer.description!.trim()
+              : 'Panier surprise préparé par ${offer.storeName}.',
+      imageUrl:
+          offer.mediaUrls.isNotEmpty
+              ? offer.mediaUrls.first
+              : _fallbackImageForCategory(category ?? offer.name),
+      originalPrice: originalPrice,
+      discountedPrice: offer.price,
+      availableQuantity: offer.availableQuantity,
+      reservedQuantity: 0,
+      partnerId: offer.storeId,
+      partnerName: offer.storeName,
+      partnerAddress: 'Commerce partenaire DailyCatch',
+      pickupStartTime: pickupStartTime,
+      pickupEndTime: pickupEndTime,
+      createdAt: now,
+      category: category?.isNotEmpty == true ? category! : 'Poissons',
+      distance: offer.distanceKm ?? 0,
+    );
+  }
+
+  static String _fallbackImageForCategory(String value) {
+    final lower = value.toLowerCase();
+    if (lower.contains('crevette') ||
+        lower.contains('crust') ||
+        lower.contains('fruit')) {
+      return 'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png';
+    }
+    if (lower.contains('coquillage') ||
+        lower.contains('huitre') ||
+        lower.contains('huître')) {
+      return 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png';
+    }
+    return 'assets/images/ChatGPT Image 13 août 2026, 00_23_55.png';
   }
 
   @override

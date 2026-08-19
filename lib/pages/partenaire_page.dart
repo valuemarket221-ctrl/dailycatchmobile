@@ -107,15 +107,15 @@ class PartenairePage extends StatelessWidget {
     ),
     DashboardItem(
       LucideIcons.packagePlus,
-      "Produits",
-      "Ajouter / Éditer",
+      "Paniers",
+      "Publier / Éditer",
       () {},
     ),
     DashboardItem(LucideIcons.layers, "Stock", "Suivi & gestion", () {}),
     DashboardItem(
       LucideIcons.shoppingBag,
-      "Commandes",
-      "Commandes reçues",
+      "Réservations",
+      "Paniers réservés",
       () {},
     ),
     DashboardItem(LucideIcons.clock, "Horaires", "Disponibilité", () {}),
@@ -134,7 +134,7 @@ class PartenairePage extends StatelessWidget {
     DashboardItem(
       LucideIcons.bell,
       "Notifications",
-      "Commandes, stock bas...",
+      "Retraits, stock bas...",
       () {},
     ),
   ];

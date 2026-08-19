@@ -1,386 +1,414 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/providers/cart_provider.dart';
+import 'package:myapp/services/checkout_service.dart';
+import 'package:myapp/services/payment_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/formatters.dart';
+import 'package:provider/provider.dart';
 
-/// Page Paiement - Clone TGTG
 class PaymentPage extends StatefulWidget {
-  final Map<String, dynamic>? paymentData;
-
   const PaymentPage({super.key, this.paymentData});
+
+  final Map<String, dynamic>? paymentData;
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  int _selectedPaymentMethod = 0;
-  String _selectedTimeSlot = '';
-  
-  final List<String> _timeSlots = [
-    'Aujourd\'hui 18:00 - 19:00',
-    'Aujourd\'hui 19:00 - 20:00',
-    'Aujourd\'hui 20:00 - 21:00',
-    'Demain 12:00 - 13:00',
-    'Demain 18:00 - 19:00',
-  ];
-
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {
-      'name': 'Payer en magasin',
-      'icon': Icons.store,
-      'description': 'Payez directement lors du retrait',
-    },
-    {
-      'name': 'Carte bancaire',
-      'icon': Icons.credit_card,
-      'description': 'Visa, Mastercard, etc.',
-    },
-    {
-      'name': 'Apple Pay',
-      'icon': Icons.phone_iphone,
-      'description': 'Paiement rapide et sécurisé',
-    },
-    {
-      'name': 'Google Pay',
-      'icon': Icons.payment,
-      'description': 'Paiement avec Google Pay',
-    },
-  ];
+  final CheckoutService _checkoutService = CheckoutService();
+  final PaymentApiService _paymentApiService = PaymentApiService();
+  late final String _idempotencyKey;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  String _selectedMethod = 'card';
 
   @override
   void initState() {
     super.initState();
-    _selectedTimeSlot = _timeSlots[0];
+    _idempotencyKey =
+        'checkout_${DateTime.now().microsecondsSinceEpoch.toString()}';
+  }
+
+  String get _pickupSlot =>
+      widget.paymentData?['pickupSlot']?.toString() ??
+      'Aujourd’hui 18:00 - 19:00';
+
+  double get _serviceFee =>
+      (widget.paymentData?['serviceFee'] as num?)?.toDouble() ?? 0;
+
+  double get _deliveryFee =>
+      (widget.paymentData?['deliveryFee'] as num?)?.toDouble() ?? 0;
+
+  String get _deliveryMode =>
+      widget.paymentData?['deliveryMode']?.toString() ?? 'pickup';
+
+  bool get _canPresentPaymentSheet =>
+      !kIsWeb &&
+      _selectedMethod == 'card' &&
+      ApiEnvironment.stripePublishableKey.isNotEmpty;
+
+  Future<void> _submitPayment(CartProvider cart) async {
+    if (cart.isEmpty || _isSubmitting) return;
+
+    final firstItem = cart.items.first;
+    final itemCount = cart.itemCount;
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final order = await _checkoutService.createOrderFromCart(
+        items:
+            cart.items
+                .map(
+                  (item) =>
+                      CheckoutCartItem(id: item.id, quantity: item.quantity),
+                )
+                .toList(),
+        pickupSlot: _pickupSlot,
+        deliveryMode: _deliveryMode,
+        idempotencyKey: _idempotencyKey,
+      );
+      final paymentCompleted = await _presentPaymentSheetIfAvailable(
+        order.orderId,
+      );
+
+      if (!mounted) return;
+
+      cart.clear();
+      context.go(
+        '/order-confirmation',
+        extra: {
+          'orderId': order.orderId,
+          'status': paymentCompleted ? 'paid' : order.status,
+          'amount': order.amount,
+          'currency': order.currency,
+          'deliveryMode': order.deliveryMode,
+          'deliveryFee': order.deliveryFee,
+          'pickupCode': order.pickupCode,
+          'pickupSlot': _pickupSlot,
+          'storeName': firstItem.storeName,
+          'productName': firstItem.name,
+          'image': firstItem.image,
+          'quantity': itemCount,
+          'paymentCompleted': paymentCompleted,
+        },
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = _messageForError(error);
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  String _messageForError(Object error) {
+    if (error is StripeException) {
+      return error.error.localizedMessage ?? 'Paiement annulé ou refusé.';
+    }
+
+    if (error is CheckoutException) {
+      return error.code == 'empty_cart'
+          ? 'Votre panier est vide.'
+          : 'Le panier contient une offre invalide.';
+    }
+
+    if (error is PaymentApiException) {
+      return switch (error.statusCode) {
+        0 => 'Connexion impossible au serveur. Vérifiez votre réseau.',
+        401 => 'Connectez-vous pour finaliser la réservation.',
+        404 => 'Cette offre n’est plus disponible.',
+        409 => 'Quantité insuffisante pour cette offre.',
+        429 => 'Trop de réservations récentes. Réessayez plus tard.',
+        _ => 'Le paiement n’a pas pu être initialisé. Réessayez.',
+      };
+    }
+
+    return 'Une erreur est survenue. Réessayez.';
+  }
+
+  Future<bool> _presentPaymentSheetIfAvailable(String orderId) async {
+    if (!_canPresentPaymentSheet) return false;
+
+    final intent = await _paymentApiService.createPaymentIntent(
+      PaymentIntentRequest(orderId: orderId),
+    );
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: SetupPaymentSheetParameters(
+        paymentIntentClientSecret: intent.clientSecret,
+        merchantDisplayName: 'DailyCatch',
+      ),
+    );
+    await Stripe.instance.presentPaymentSheet();
+    return true;
+  }
+
+  String _actionLabel(double total) {
+    final amount = AppFormatters.formatCfa(total);
+    if (_canPresentPaymentSheet) return 'Payer $amount';
+    return 'Réserver $amount';
   }
 
   @override
-  Widget build(BuildContext context) {
-    final produit = widget.paymentData?['produit'] as Map<String, dynamic>? ?? {};
-    final quantity = widget.paymentData?['quantity'] as int? ?? 1;
-    final double price = double.parse(produit['prix']?.toString() ?? '0');
-    final double total = price * quantity;
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    body: SafeArea(
+      child: Consumer<CartProvider>(
+        builder: (context, cart, _) {
+          final subtotal = cart.totalPrice;
+          final total = subtotal + _serviceFee + _deliveryFee;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Paiement',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Product summary
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.blueBic,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_bag,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        produit['nom'] as String? ?? 'Produit',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: AppColors.blueBic,
                       ),
-                      Text(
-                        'Quantité: $quantity',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                    ),
+                    const Spacer(),
+                    Text('PAIEMENT', style: _header),
+                    const Spacer(),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                Text('Récapitulatif de la commande', style: _section),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: _card,
+                  child: Column(
+                    children: [
+                      _Line('Sous-total', AppFormatters.formatCfa(subtotal)),
+                      const SizedBox(height: 14),
+                      _Line(
+                        'Frais de service',
+                        AppFormatters.formatCfa(_serviceFee),
+                      ),
+                      const SizedBox(height: 14),
+                      _Line(
+                        'Livraison',
+                        _deliveryFee > 0
+                            ? AppFormatters.formatCfa(_deliveryFee)
+                            : 'Gratuit',
+                      ),
+                      const Divider(height: 28),
+                      _Line(
+                        'Total',
+                        AppFormatters.formatCfa(total),
+                        bold: true,
                       ),
                     ],
                   ),
                 ),
-                Text(
-                  '${total.toStringAsFixed(2)}€',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.blueBic,
-                  ),
+                const SizedBox(height: 26),
+                Text('Méthode de paiement', style: _section),
+                const SizedBox(height: 12),
+                _PayOption(
+                  'Carte bancaire',
+                  selected: _selectedMethod == 'card',
+                  suffix: 'VISA   ••••',
+                  onTap: () => setState(() => _selectedMethod = 'card'),
                 ),
-              ],
-            ),
-          ),
-          
-          // Time slot selection
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Créneau de retrait',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ..._timeSlots.map(
-                    (slot) => GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedTimeSlot = slot;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _selectedTimeSlot == slot
-                              ? AppColors.blueBic.withValues(alpha: 0.1)
-                              : Colors.white,
-                          border: Border.all(
-                            color: _selectedTimeSlot == slot
-                                ? AppColors.blueBic
-                                : Colors.grey[300]!,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              color: _selectedTimeSlot == slot
-                                  ? AppColors.blueBic
-                                  : Colors.grey,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                slot,
-                                style: GoogleFonts.poppins(
-                                  color: _selectedTimeSlot == slot
-                                      ? AppColors.blueBic
-                                      : Colors.black,
-                                ),
-                              ),
-                            ),
-                            if (_selectedTimeSlot == slot)
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppColors.blueBic,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Payment method
-                  Text(
-                    'Méthode de paiement',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ..._paymentMethods.asMap().entries.map(
-                    (entry) => GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedPaymentMethod = entry.key;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _selectedPaymentMethod == entry.key
-                              ? AppColors.blueBic.withValues(alpha: 0.1)
-                              : Colors.white,
-                          border: Border.all(
-                            color: _selectedPaymentMethod == entry.key
-                                ? AppColors.blueBic
-                                : Colors.grey[300]!,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              entry.value['icon'] as IconData,
-                              color: _selectedPaymentMethod == entry.key
-                                  ? AppColors.blueBic
-                                  : Colors.grey,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    entry.value['name'] as String,
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedPaymentMethod == entry.key
-                                          ? AppColors.blueBic
-                                          : Colors.black,
-                                    ),
-                                  ),
-                                  Text(
-                                    entry.value['description'] as String,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_selectedPaymentMethod == entry.key)
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppColors.blueBic,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                _PayOption(
+                  'Mobile Money',
+                  selected: _selectedMethod == 'mobile_money',
+                  onTap: () => setState(() => _selectedMethod = 'mobile_money'),
+                ),
+                _PayOption(
+                  'Orange Money',
+                  selected: _selectedMethod == 'orange_money',
+                  onTap: () => setState(() => _selectedMethod = 'orange_money'),
+                ),
+                _PayOption(
+                  'Espèces à la livraison',
+                  selected: _selectedMethod == 'cash',
+                  onTap: () => setState(() => _selectedMethod = 'cash'),
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 4),
+                  _PaymentErrorBanner(message: _errorMessage!),
                 ],
-              ),
-            ),
-          ),
-          
-          // Bottom bar with total and pay button
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total à payer:',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${total.toStringAsFixed(2)}€',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.blueBic,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                const Spacer(),
                 SizedBox(
                   width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: () => _confirmPayment(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.blueBic,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
+                  height: 48,
+                  child: FilledButton(
+                    onPressed:
+                        cart.isEmpty || _isSubmitting
+                            ? null
+                            : () => _submitPayment(cart),
+                    style: _buttonStyle,
                     child: Text(
-                      'Confirmer le paiement',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      _isSubmitting ? 'Traitement...' : _actionLabel(total),
+                      style: _buttonText,
                     ),
                   ),
                 ),
+                const SizedBox(height: 18),
+                Center(child: Text('Paiement 100% sécurisé', style: _secure)),
+                const SizedBox(height: 36),
               ],
             ),
-          ),
-        ],
+          );
+        },
       ),
-    );
-  }
-
-  void _confirmPayment(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Confirmer le paiement',
-          style: GoogleFonts.poppins(),
-        ),
-        content: Text(
-          'Êtes-vous sûr de vouloir confirmer ce paiement de ${(double.parse(widget.paymentData?['produit']?['prix']?.toString() ?? '0') * (widget.paymentData?['quantity'] ?? 1)).toStringAsFixed(2)}€ ?',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: Text(
-              'Annuler',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.pop();
-              context.push('/order-confirmation');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.blueBic,
-            ),
-            child: Text(
-              'Confirmer',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
 }
+
+class _Line extends StatelessWidget {
+  const _Line(this.l, this.v, {this.bold = false});
+
+  final String l;
+  final String v;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(l, style: bold ? _bold : _text),
+      const Spacer(),
+      Text(v, style: bold ? _bold : _text),
+    ],
+  );
+}
+
+class _PayOption extends StatelessWidget {
+  const _PayOption(
+    this.label, {
+    required this.onTap,
+    this.selected = false,
+    this.suffix,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+  final String? suffix;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      height: 54,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color:
+              selected
+                  ? AppColors.greenTGTG.withValues(alpha: .45)
+                  : const Color(0xFFE1E8E6),
+          width: selected ? 1.5 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_off,
+            color: selected ? AppColors.greenTGTG : const Color(0xFFD1DBDD),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: _option)),
+          if (suffix != null) Text(suffix!, style: _suffix),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PaymentErrorBanner extends StatelessWidget {
+  const _PaymentErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF3F1),
+      border: Border.all(color: const Color(0xFFFFD2CC)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(message, style: _error),
+  );
+}
+
+final _header = GoogleFonts.poppins(
+  fontSize: 15,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _section = GoogleFonts.poppins(
+  fontSize: 14,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF263B3E),
+);
+final _text = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFF526669),
+);
+final _bold = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _option = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF263B3E),
+);
+final _suffix = GoogleFonts.poppins(
+  fontSize: 10,
+  fontWeight: FontWeight.w900,
+  color: AppColors.blueBic,
+);
+final _secure = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w800,
+  color: AppColors.blueBic,
+);
+final _error = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFFB42318),
+);
+final _buttonText = GoogleFonts.poppins(
+  fontSize: 13,
+  fontWeight: FontWeight.w900,
+  color: Colors.white,
+);
+final _buttonStyle = FilledButton.styleFrom(
+  backgroundColor: AppColors.blueBic,
+  disabledBackgroundColor: const Color(0xFFC7D2D4),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+);
+final _card = BoxDecoration(
+  color: Colors.white,
+  border: Border.all(color: const Color(0xFFE1E8E6)),
+  borderRadius: BorderRadius.circular(12),
+);

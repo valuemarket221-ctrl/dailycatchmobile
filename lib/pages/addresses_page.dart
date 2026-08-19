@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
-/// Page des adresses
 class AddressesPage extends StatefulWidget {
   const AddressesPage({super.key});
 
@@ -11,355 +11,171 @@ class AddressesPage extends StatefulWidget {
 }
 
 class _AddressesPageState extends State<AddressesPage> {
-  // Adresses fictives
-  final List<Address> _addresses = [
-    Address(
-      id: '1',
-      name: 'Domicile',
-      address: '123 Rue de la Paix, Dakar',
-      city: 'Dakar',
-      isDefault: true,
-    ),
-    Address(
-      id: '2',
-      name: 'Bureau',
-      address: '456 Avenue Leopold Sedar Senghor, Dakar',
-      city: 'Dakar',
-      isDefault: false,
-    ),
+  final List<String> _addresses = [
+    'Domicile\nSacré-Cœur 3, Dakar',
+    'Bureau\nPlateau, Dakar',
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Mes adresses',
-          style: GoogleFonts.poppins(),
-        ),
+  void _addAddress() {
+    context.push('/new-address');
+  }
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text, style: GoogleFonts.poppins()),
+        behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.blueBic,
-        foregroundColor: Colors.white,
-      ),
-      body: _addresses.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _addresses.length,
-              itemBuilder: (context, index) {
-                return _buildAddressCard(_addresses[index]);
-              },
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addAddress,
-        icon: const Icon(Icons.add),
-        label: Text(
-          'Ajouter',
-          style: GoogleFonts.poppins(),
-        ),
-        backgroundColor: AppColors.blueBic,
-        foregroundColor: Colors.white,
       ),
     );
   }
 
-  Widget _buildAddressCard(Address address) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  @override
+  Widget build(BuildContext context) => _SecondaryShell(
+    title: 'MES ADRESSES',
+    child: Column(
+      children: [
+        ..._addresses.asMap().entries.map((entry) {
+          final index = entry.key;
+          final address = entry.value;
+          return _CardRow(
+            icon: index == 0 ? Icons.home_outlined : Icons.location_on_outlined,
+            title: address.split('\n').first,
+            subtitle: address.split('\n').last,
+            trailing: index == 0 ? 'Par défaut' : 'Modifier',
+            onTap: () => _message('Adresse sélectionnée'),
+          );
+        }),
+        const Spacer(),
+        _PrimaryButton(label: 'Ajouter une adresse', onPressed: _addAddress),
+      ],
+    ),
+  );
+}
+
+class _SecondaryShell extends StatelessWidget {
+  const _SecondaryShell({required this.title, required this.child});
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    body: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      address.name == 'Domicile' ? Icons.home : Icons.business,
-                      color: AppColors.blueBic,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      address.name,
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (address.isDefault) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.blueBic.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Par défaut',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: AppColors.blueBic,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                IconButton(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'edit') _editAddress(address);
-                    else if (value == 'delete') _deleteAddress(address);
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit, size: 20),
-                          const SizedBox(width: 8),
-                          Text('Modifier', style: GoogleFonts.poppins()),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete, size: 20, color: Colors.red),
-                          const SizedBox(width: 8),
-                          Text('Supprimer',
-                              style: GoogleFonts.poppins(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                const Spacer(),
+                Text(title, style: _header),
+                const Spacer(),
+                const SizedBox(width: 48),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              address.address,
-              style: GoogleFonts.poppins(),
-            ),
-            Text(
-              address.city,
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (!address.isDefault)
-                  TextButton(
-                    onPressed: () => _setDefault(address),
-                    child: Text(
-                      'Définir par défaut',
-                      style: GoogleFonts.poppins(
-                        color: AppColors.blueBic,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            const SizedBox(height: 24),
+            Expanded(child: child),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.location_off,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Aucune adresse',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Ajoutez une adresse pour la livraison',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _addAddress() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => _buildAddressForm(),
-    );
-  }
-
-  void _editAddress(Address address) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => _buildAddressForm(address: address),
-    );
-  }
-
-  void _deleteAddress(Address address) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer'),
-        content: Text('Voulez-vous vraiment supprimer "${address.name}" ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Adresse supprimée',
-                    style: GoogleFonts.poppins(),
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child:
-                const Text('Supprimer', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _setDefault(Address address) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${address.name} est maintenant l\'adresse par défaut',
-          style: GoogleFonts.poppins(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddressForm({Address? address}) {
-    final nameController =
-        TextEditingController(text: address?.name ?? '');
-    final addressController =
-        TextEditingController(text: address?.address ?? '');
-    final cityController =
-        TextEditingController(text: address?.city ?? '');
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            address == null ? 'Nouvelle adresse' : 'Modifier l\'adresse',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: nameController,
-            decoration: InputDecoration(
-              labelText: 'Nom (Domicile, Bureau...)',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: addressController,
-            decoration: InputDecoration(
-              labelText: 'Adresse',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: cityController,
-            decoration: InputDecoration(
-              labelText: 'Ville',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      address == null
-                          ? 'Adresse ajoutée'
-                          : 'Adresse mise à jour',
-                      style: GoogleFonts.poppins(),
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.blueBic,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Enregistrer',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
 }
 
-/// Modèle d'adresse
-class Address {
-  final String id;
-  final String name;
-  final String address;
-  final String city;
-  final bool isDefault;
-
-  Address({
-    required this.id,
-    required this.name,
-    required this.address,
-    required this.city,
-    required this.isDefault,
+class _CardRow extends StatelessWidget {
+  const _CardRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
   });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String trailing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE2EAEA)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.blueBic, size: 24),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: _title),
+                const SizedBox(height: 4),
+                Text(subtitle, style: _subtitle),
+              ],
+            ),
+          ),
+          Text(trailing, style: _link),
+        ],
+      ),
+    ),
+  );
 }
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({required this.label, required this.onPressed});
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    height: 48,
+    child: FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.blueBic,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(label, style: _button),
+    ),
+  );
+}
+
+final _header = GoogleFonts.poppins(
+  fontSize: 15,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _title = GoogleFonts.poppins(
+  fontSize: 13,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _subtitle = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w600,
+  color: const Color(0xFF526669),
+);
+final _link = GoogleFonts.poppins(
+  fontSize: 10.5,
+  fontWeight: FontWeight.w900,
+  color: AppColors.blueBic,
+);
+final _button = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: Colors.white,
+);

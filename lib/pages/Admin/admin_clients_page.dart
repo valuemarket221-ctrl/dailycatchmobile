@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Admin Clients Page - Clone TGTG Style
 /// Gestion des utilisateurs/clients de la plateforme
@@ -18,6 +19,12 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   int _currentPage = 0;
   final int _itemsPerPage = 10;
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   // Mock data for clients
   final List<Map<String, dynamic>> _clients = List.generate(
     25,
@@ -25,7 +32,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
       'id': 'USR${index + 1}',
       'name': 'Client ${index + 1}',
       'email': 'client${index + 1}@example.com',
-      'phone': '+221 77${index}00123${index}',
+      'phone': '+221 77${index}00123$index',
       'status': index % 5 == 0 ? 'inactive' : 'active',
       'ordersCount': index * 3,
       'totalSpent': (index * 3 * 15.50),
@@ -47,11 +54,15 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     // Filter by search
     if (_searchController.text.isNotEmpty) {
       final query = _searchController.text.toLowerCase();
-      filtered = filtered.where((c) =>
-        c['name'].toString().toLowerCase().contains(query) ||
-        c['email'].toString().toLowerCase().contains(query) ||
-        c['phone'].toString().contains(query)
-      ).toList();
+      filtered =
+          filtered
+              .where(
+                (c) =>
+                    c['name'].toString().toLowerCase().contains(query) ||
+                    c['email'].toString().toLowerCase().contains(query) ||
+                    c['phone'].toString().contains(query),
+              )
+              .toList();
     }
 
     return filtered;
@@ -59,16 +70,17 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
 
   List<Map<String, dynamic>> get _paginatedClients {
     final start = _currentPage * _itemsPerPage;
-    final end = (start + _itemsPerPage) > _filteredClients.length
-        ? _filteredClients.length
-        : start + _itemsPerPage;
+    final end =
+        (start + _itemsPerPage) > _filteredClients.length
+            ? _filteredClients.length
+            : start + _itemsPerPage;
     return _filteredClients.sublist(start, end);
   }
 
   int get _totalPages => (_filteredClients.length / _itemsPerPage).ceil();
 
   Color _getStatusColor(String status) {
-    return status == 'active' ? Colors.green : Colors.red;
+    return status == 'active' ? AppColors.greenTGTG : AppTheme.errorColor;
   }
 
   String _getStatusText(String status) {
@@ -78,23 +90,24 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
         title: Text(
-          'Clients',
+          'Sauveurs',
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: AppColors.blueBic,
           ),
         ),
         leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+          builder:
+              (context) => IconButton(
+                icon: const Icon(Icons.menu, color: AppColors.blueBic),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
         ),
         actions: [
           IconButton(
@@ -106,19 +119,24 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
       drawer: _buildDrawer(context),
       body: Column(
         children: [
+          _buildSummaryHeader(),
           // Search bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Rechercher un client...',
+                hintText: 'Rechercher un sauveur...',
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(color: AppTheme.softBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.softBorder),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
@@ -147,7 +165,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${_filteredClients.length} clients',
+                  '${_filteredClients.length} sauveurs',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -169,8 +187,57 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
             ),
           ),
           // Pagination
-          if (_totalPages > 1)
-            _buildPagination(),
+          if (_totalPages > 1) _buildPagination(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryHeader() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.blueBic.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.people_alt, color: AppColors.blueBic),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Communauté DailyCatch',
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.blueBic,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Suivi des comptes, réservations et activité récente.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -184,15 +251,18 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.blueBic : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppColors.blueBic : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.blueBic : AppTheme.softBorder,
+          ),
         ),
         child: Text(
           label,
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Colors.black,
+            color: isSelected ? Colors.white : AppColors.blueBic,
           ),
         ),
       ),
@@ -208,13 +278,8 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: AppTheme.softBorder),
+          boxShadow: AppTheme.shadowSm,
         ),
         child: Column(
           children: [
@@ -252,12 +317,19 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: AppColors.blueBic,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(client['status'] as String).withValues(alpha: 0.1),
+                              color: _getStatusColor(
+                                client['status'] as String,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -265,7 +337,9 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: _getStatusColor(client['status'] as String),
+                                color: _getStatusColor(
+                                  client['status'] as String,
+                                ),
                               ),
                             ),
                           ),
@@ -290,11 +364,29 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
             // Stats row
             Row(
               children: [
-                _buildStat(Icons.shopping_bag, '${client['ordersCount']}', 'Commandes'),
-                const SizedBox(width: 24),
-                _buildStat(Icons.euro, '${(client['totalSpent'] as double).toStringAsFixed(0)}€', 'Dépensé'),
-                const SizedBox(width: 24),
-                _buildStat(Icons.access_time, _getDaysAgo(client['lastOrder'] as DateTime), 'Dernière cmd'),
+                Expanded(
+                  child: _buildStat(
+                    Icons.shopping_bag,
+                    '${client['ordersCount']}',
+                    'Paniers',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildStat(
+                    Icons.euro,
+                    '${(client['totalSpent'] as double).toStringAsFixed(0)}€',
+                    'Dépensé',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildStat(
+                    Icons.access_time,
+                    _getDaysAgo(client['lastOrder'] as DateTime),
+                    'Dernier retrait',
+                  ),
+                ),
               ],
             ),
           ],
@@ -307,24 +399,29 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     return Column(
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 16, color: AppColors.blueBic),
             const SizedBox(width: 4),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+            Flexible(
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
         Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: Colors.grey[500],
-          ),
+          style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[500]),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -349,9 +446,8 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            onPressed: _currentPage > 0
-                ? () => setState(() => _currentPage--)
-                : null,
+            onPressed:
+                _currentPage > 0 ? () => setState(() => _currentPage--) : null,
           ),
           const SizedBox(width: 16),
           Text(
@@ -361,9 +457,10 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
           const SizedBox(width: 16),
           IconButton(
             icon: const Icon(Icons.chevron_right),
-            onPressed: _currentPage < _totalPages - 1
-                ? () => setState(() => _currentPage++)
-                : null,
+            onPressed:
+                _currentPage < _totalPages - 1
+                    ? () => setState(() => _currentPage++)
+                    : null,
           ),
         ],
       ),
@@ -377,7 +474,10 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         children: [
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: AppColors.blueBic),
-            accountName: Text('Administrateur', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            accountName: Text(
+              'Administrateur',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
             accountEmail: Text('admin@dailycatch.com'),
             currentAccountPicture: const CircleAvatar(
               backgroundColor: Colors.white,

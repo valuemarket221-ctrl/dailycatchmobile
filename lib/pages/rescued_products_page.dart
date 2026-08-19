@@ -6,8 +6,7 @@ import 'package:myapp/data/rescued_product_repository.dart';
 import 'package:myapp/models/rescued_product.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 
-/// Page listant les produits "sauvés" ( Too Good To Go )
-/// Affiche les produits alimentaires rescued du gaspillage
+/// Page listant les paniers surprise sauvés du gaspillage.
 class RescuedProductsPage extends StatefulWidget {
   const RescuedProductsPage({super.key});
 
@@ -17,6 +16,8 @@ class RescuedProductsPage extends StatefulWidget {
 
 class _RescuedProductsPageState extends State<RescuedProductsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final RescuedProductRepository _rescuedProductRepository =
+      RescuedProductRepository();
   String _searchQuery = '';
   String _selectedCategory = 'Tous';
   bool _isLoading = true;
@@ -37,9 +38,12 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
 
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
-    // Utilise les données fictives pour le développement
-    _products = RescuedProductRepository.getMockProducts();
-    setState(() => _isLoading = false);
+    final products = await _rescuedProductRepository.getAvailableProducts();
+    if (!mounted) return;
+    setState(() {
+      _products = products;
+      _isLoading = false;
+    });
   }
 
   List<RescuedProduct> get _filteredProducts {
@@ -60,7 +64,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Sauvez les produits!',
+          'Paniers à sauver',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -74,10 +78,8 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {
-              context.push('/notifications-settings');
-            },
+            icon: const Icon(Icons.shopping_bag, color: Colors.white),
+            onPressed: () => context.push('/cart'),
           ),
         ],
       ),
@@ -94,7 +96,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Rechercher un produit ou partenaire...',
+                hintText: 'Rechercher un panier ou un commerce...',
                 prefixIcon: const Icon(Icons.search, color: AppColors.blueBic),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -153,7 +155,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
 
           const SizedBox(height: 16),
 
-          // Liste des produits
+          // Liste des paniers
           Expanded(
             child:
                 _isLoading
@@ -260,7 +262,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
           label,
           style: GoogleFonts.poppins(
             fontSize: 12,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -338,7 +340,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -367,7 +369,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
               ],
             ),
 
-            // Informations du produit
+            // Informations du panier
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -380,7 +382,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.yellowColor.withOpacity(0.2),
+                      color: AppColors.yellowColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -395,7 +397,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
 
                   const SizedBox(height: 8),
 
-                  // Nom du produit
+                  // Nom du panier
                   Text(
                     product.name,
                     style: GoogleFonts.poppins(
@@ -411,11 +413,15 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                     children: [
                       const Icon(Icons.store, size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(
-                        product.partnerName,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                      Expanded(
+                        child: Text(
+                          product.partnerName,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -442,27 +448,32 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${product.originalPrice.toStringAsFixed(2)}€',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                              decoration: TextDecoration.lineThrough,
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.end,
+                          children: [
+                            Text(
+                              '${product.originalPrice.toStringAsFixed(2)}€',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                                decoration: TextDecoration.lineThrough,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '${product.discountedPrice.toStringAsFixed(2)}€',
-                            style: GoogleFonts.poppins(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.blueBic,
+                            Text(
+                              '${product.discountedPrice.toStringAsFixed(2)}€',
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.blueBic,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed:
                             product.isAvailable
@@ -482,7 +493,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                           backgroundColor: AppColors.yellowColor,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
+                            horizontal: 12,
                             vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
@@ -490,12 +501,12 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                           ),
                         ),
                         child: Text(
-                          product.isAvailable
-                              ? 'Sauver ce produit'
-                              : 'Non disponible',
+                          product.isAvailable ? 'Réserver' : 'Non disponible',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -506,7 +517,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'Plus que ${product.remainingQuantity} disponible(s)!',
+                        'Plus que ${product.remainingQuantity} panier(s)!',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: Colors.red,
@@ -531,7 +542,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
           Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
-            'Aucun produit disponible',
+            'Aucun panier disponible',
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -540,7 +551,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Revenez plus tard pour sauver des produits!',
+            'Revenez plus tard pour sauver des paniers!',
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
@@ -549,7 +560,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
   }
 }
 
-/// Page de détail d'un produit "sauvé"
+/// Page de détail d'un panier sauvé.
 class RescuedProductDetailPage extends StatelessWidget {
   final RescuedProduct product;
 
@@ -626,7 +637,7 @@ class RescuedProductDetailPage extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.yellowColor.withOpacity(0.2),
+                      color: AppColors.yellowColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -734,7 +745,7 @@ class RescuedProductDetailPage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.blueBic.withOpacity(0.1),
+                      color: AppColors.blueBic.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -871,7 +882,10 @@ class RescuedProductDetailPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.blueBic, AppColors.blueBic.withOpacity(0.8)],
+            colors: [
+              AppColors.blueBic,
+              AppColors.blueBic.withValues(alpha: 0.8),
+            ],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -891,7 +905,7 @@ class RescuedProductDetailPage extends StatelessWidget {
               label,
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -917,7 +931,7 @@ class RescuedProductDetailPage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Produit: ${product.name}', style: GoogleFonts.poppins()),
+                Text('Panier: ${product.name}', style: GoogleFonts.poppins()),
                 Text(
                   'Partenaire: ${product.partnerName}',
                   style: GoogleFonts.poppins(),
@@ -928,7 +942,7 @@ class RescuedProductDetailPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Vous allez recevoir un QR code par email pour récupérer votre produit.',
+                  'Vous allez recevoir un QR code pour retirer votre panier chez le commerce.',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.grey[600],

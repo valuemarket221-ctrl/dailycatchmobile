@@ -11,8 +11,10 @@ class Partner {
 }
 
 class PartnersPage extends StatefulWidget {
+  const PartnersPage({super.key});
+
   @override
-  _PartnersPageState createState() => _PartnersPageState();
+  State<PartnersPage> createState() => _PartnersPageState();
 }
 
 class _PartnersPageState extends State<PartnersPage> {
@@ -131,7 +133,7 @@ class _PartnersPageState extends State<PartnersPage> {
                         vertical: 10,
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: AppColors.blueBic.withOpacity(0.1),
+                        backgroundColor: AppColors.blueBic.withValues(alpha: 0.1),
                         child: Icon(Icons.business, color: AppColors.blueBic),
                       ),
                       title: Text(
@@ -150,7 +152,7 @@ class _PartnersPageState extends State<PartnersPage> {
                         decoration: BoxDecoration(
                           color: getStatusColor(
                             partner.status,
-                          ).withOpacity(0.1),
+                          ).withValues(alpha: 0.1),
                           border: Border.all(
                             color: getStatusColor(partner.status),
                           ),

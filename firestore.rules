@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasRole(expectedRole) {
+      return signedIn() && request.auth.token.role == expectedRole;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isSupport() {
+      return hasRole('support');
+    }
+
+    function isPartner() {
+      return hasRole('partner');
+    }
+
+    function protectedUserFields() {
+      return ['role', 'requestedRole', 'partnerApplicationStatus'];
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || isSupport();
+
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'client'
+        && !request.resource.data.keys().hasAny(['admin', 'support']);
+
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(protectedUserFields());
+
+      allow delete: if false;
+    }
+
+    match /partner_applications/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || isSupport();
+
+      allow create: if isOwner(userId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending_review'
+        && !request.resource.data.keys().hasAny([
+          'approvedAt',
+          'rejectedAt',
+          'reviewedAt',
+          'reviewedBy'
+        ]);
+
+      allow update, delete: if false;
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /baskets/{basketId} {
+      allow read: if true;
+      allow write: if isAdmin() || isPartner();
+    }
+
+    match /rescued_products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin() || isPartner();
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn()
+        && (
+          resource.data.userId == request.auth.uid ||
+          isAdmin() ||
+          isSupport() ||
+          isPartner()
+        );
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
+import 'package:myapp/widgets/dailycatch_tile_layer.dart';
 
 class PickupLocationPage extends StatefulWidget {
   const PickupLocationPage({super.key});
@@ -114,11 +115,7 @@ class _PickupLocationPageState extends State<PickupLocationPage> {
                   initialZoom: 10.0,
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.app',
-                  ),
+                  const DailyCatchTileLayer(),
                   MarkerLayer(
                     markers: [
                       Marker(

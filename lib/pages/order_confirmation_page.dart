@@ -2,371 +2,253 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/utils/formatters.dart';
 
-class OrderConfirmationPage extends StatefulWidget {
-  const OrderConfirmationPage({super.key});
+class OrderConfirmationPage extends StatelessWidget {
+  const OrderConfirmationPage({super.key, this.orderData});
+  final Map<String, dynamic>? orderData;
+
+  String get _storeName =>
+      orderData?['storeName']?.toString() ?? 'Poissonnerie Yoff';
+
+  String get _productName =>
+      orderData?['productName']?.toString() ?? 'Panier surprise';
+
+  String get _pickupSlot =>
+      orderData?['pickupSlot']?.toString() ?? 'Aujourd’hui 17:00 - 19:00';
+
+  String get _orderId => orderData?['orderId']?.toString() ?? 'DCYF24A6B7';
+
+  String get _image => orderData?['image']?.toString() ?? '';
+
+  String get _currency => orderData?['currency']?.toString() ?? 'XOF';
+
+  num get _amount {
+    final amount = orderData?['amount'];
+    if (amount is num) return amount;
+    return num.tryParse(amount?.toString() ?? '') ?? 13000;
+  }
+
+  bool get _paymentCompleted => orderData?['paymentCompleted'] == true;
+
+  String get _deliveryMode =>
+      orderData?['deliveryMode']?.toString() ?? 'pickup';
+
+  bool get _isDelivery => _deliveryMode == 'delivery';
 
   @override
-  State<OrderConfirmationPage> createState() => _OrderConfirmationPageState();
-}
-
-class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
-  final Map<String, dynamic> order = {
-    'id': 'CMD-2024-001234',
-    'date': '04 février 2024',
-    'time': '14:30',
-    'store': 'Poissonnerie du Port',
-    'address': '15 Rue du Port, 29000 Quimper',
-    'items': [
-      {'name': 'Sacs magic Thon Rouge', 'quantity': 1, 'price': 18.00},
-      {'name': 'Sacs magic Crevettes', 'quantity': 2, 'price': 15.50},
-    ],
-    'total': 49.00,
-    'savings': 13.50,
-    'pickupTime': '18:00 - 19:00',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () => context.go('/home'),
-        ),
-        title: Text(
-          'Commande confirmée',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // Success animation
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppColors.greenTGTG.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  color: AppColors.greenTGTG,
-                  size: 80,
-                ),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(26, 38, 26, 0),
+        child: Column(
+          children: [
+            Text('CONFIRMATION', style: _header),
+            const SizedBox(height: 42),
+            Container(
+              width: 82,
+              height: 82,
+              decoration: const BoxDecoration(
+                color: AppColors.blueBic,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 24),
-              Text(
-                'Merci pour votre commande !',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Votre commande a été enregistrée avec succès',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-
-              // Order details card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey[200]!),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: const Icon(Icons.check, color: Colors.white, size: 48),
+            ),
+            const SizedBox(height: 28),
+            Text('Merci !', style: _thanks),
+            const SizedBox(height: 10),
+            Text(
+              _paymentCompleted
+                  ? 'Votre réservation est confirmée.'
+                  : 'Votre réservation est enregistrée.',
+              textAlign: TextAlign.center,
+              style: _sub,
+            ),
+            const SizedBox(height: 30),
+            Container(
+              decoration: _card,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
                       children: [
-                        Text(
-                          'Numéro de commande',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                        Text(
-                          order['id'],
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
-
-                    // Store info
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.greenTGTG.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.store,
-                            color: AppColors.greenTGTG,
-                            size: 20,
-                          ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _OrderImage(path: _image),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text(_storeName, style: _name),
+                              Text(_productName, style: _sub),
+                              const SizedBox(height: 8),
                               Text(
-                                order['store'],
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black,
+                                AppFormatters.formatMoney(
+                                  _amount,
+                                  currency: _currency,
                                 ),
-                              ),
-                              Text(
-                                order['address'],
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
-                                ),
+                                style: _name,
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-
-                    // Pickup time
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            color: AppColors.greenTGTG,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Heure de retrait',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                              Text(
-                                order['pickupTime'],
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Items
-                    Text(
-                      'Produits commandés',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...order['items'].map<Widget>(
-                      (item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '${item['name']} x${item['quantity']}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            Text(
-                              '${item['price'].toStringAsFixed(2)} €',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
                       children: [
-                        Text(
-                          'Total',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
+                        _Row(
+                          _isDelivery ? 'Livraison prévue' : 'Retrait le',
+                          _pickupSlot,
                         ),
-                        Text(
-                          '${order['total'].toStringAsFixed(2)} €',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.greenTGTG,
-                          ),
+                        const SizedBox(height: 18),
+                        _Row(
+                          _isDelivery ? 'Adresse de livraison' : 'Adresse',
+                          _isDelivery
+                              ? 'Adresse client'
+                              : 'Commerce partenaire',
                         ),
+                        const SizedBox(height: 18),
+                        _Row('N° de commande', _orderId),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 24),
-
-              // Savings highlight
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.greenTGTG.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.greenTGTG.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.eco, color: AppColors.greenTGTG, size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Vous avez sauvé ${order['savings'].toStringAsFixed(2)} € !',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.greenTGTG,
-                            ),
-                          ),
-                          Text(
-                            'Et contribué à réduire le gaspillage alimentaire',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: () => context.go('/my-reservations'),
+                style: _buttonStyle,
+                child: Text('Voir ma réservation', style: _buttonText),
               ),
-
-              const SizedBox(height: 32),
-
-              // Action buttons
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    side: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  onPressed: () {
-                    // Navigate to orders history
-                    context.go('/orders');
-                  },
-                  child: Text(
-                    'Voir mes commandes',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.greenTGTG,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: () => context.go('/home'),
-                  child: Text(
-                    'Retour à l\'accueil',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 18),
+            GestureDetector(
+              onTap: () => context.go('/home'),
+              child: Text('Retour à l’accueil', style: _green),
+            ),
+            const SizedBox(height: 28),
+          ],
         ),
       ),
-    );
+    ),
+  );
+}
+
+class _OrderImage extends StatelessWidget {
+  const _OrderImage({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: 70,
+        height: 70,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const _OrderImageFallback(),
+      );
+    }
+
+    if (path.isNotEmpty) {
+      return Image.asset(
+        path,
+        width: 70,
+        height: 70,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const _OrderImageFallback(),
+      );
+    }
+
+    return const _OrderImageFallback();
   }
 }
+
+class _OrderImageFallback extends StatelessWidget {
+  const _OrderImageFallback();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 70,
+    height: 70,
+    color: const Color(0xFFEAF3F1),
+    child: const Icon(Icons.shopping_bag_outlined, color: AppColors.blueBic),
+  );
+}
+
+class _Row extends StatelessWidget {
+  const _Row(this.l, this.v);
+  final String l;
+  final String v;
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: Text(l, style: _label)),
+      Expanded(child: Text(v, textAlign: TextAlign.right, style: _value)),
+    ],
+  );
+}
+
+final _header = GoogleFonts.poppins(
+  fontSize: 15,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _thanks = GoogleFonts.poppins(
+  fontSize: 24,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _sub = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFF526669),
+);
+final _name = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _label = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFF526669),
+);
+final _value = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _green = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: AppColors.greenTGTG,
+);
+final _buttonText = GoogleFonts.poppins(
+  fontSize: 13,
+  fontWeight: FontWeight.w900,
+  color: Colors.white,
+);
+final _buttonStyle = FilledButton.styleFrom(
+  backgroundColor: AppColors.blueBic,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+);
+final _card = BoxDecoration(
+  border: Border.all(color: const Color(0xFFE1E8E6)),
+  borderRadius: BorderRadius.circular(12),
+);

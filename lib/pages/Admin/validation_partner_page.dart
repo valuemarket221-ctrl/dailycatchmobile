@@ -13,10 +13,10 @@ class Partner {
 class PartnerValidationPage extends StatefulWidget {
   final Partner partner;
 
-  PartnerValidationPage({required this.partner});
+  const PartnerValidationPage({super.key, required this.partner});
 
   @override
-  _PartnerValidationPageState createState() => _PartnerValidationPageState();
+  State<PartnerValidationPage> createState() => _PartnerValidationPageState();
 }
 
 class _PartnerValidationPageState extends State<PartnerValidationPage> {
@@ -109,7 +109,7 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: getStatusColor(status).withOpacity(0.1),
+                        color: getStatusColor(status).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: getStatusColor(status)),
                       ),

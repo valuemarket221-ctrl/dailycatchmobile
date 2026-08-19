@@ -4,8 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart'; // Tes couleurs personnalisées
 
 class CountrySelectionPage extends StatefulWidget {
+  const CountrySelectionPage({super.key});
+
   @override
-  _CountrySelectionPageState createState() => _CountrySelectionPageState();
+  State<CountrySelectionPage> createState() => _CountrySelectionPageState();
 }
 
 class _CountrySelectionPageState extends State<CountrySelectionPage> {
@@ -29,6 +31,8 @@ class _CountrySelectionPageState extends State<CountrySelectionPage> {
       setState(() => _isLoading = true);
 
       Future.delayed(Duration(seconds: 2), () {
+        if (!mounted) return;
+
         setState(() => _isLoading = false);
         Navigator.pushNamed(context, '/geolocation');
       });
@@ -59,26 +63,28 @@ class _CountrySelectionPageState extends State<CountrySelectionPage> {
             ),
             SizedBox(height: 10),
             Expanded(
-              child: ListView.builder(
-                itemCount: countries.length,
-                itemBuilder: (context, index) {
-                  String country = countries[index];
-                  return RadioListTile<String>(
-                    title: Text(
-                      country,
-                      style: GoogleFonts.poppins(fontSize: 16),
-                    ),
-                    value: country,
-                    groupValue: _selectedCountry,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCountry = value;
-                        _showError = false;
-                      });
-                    },
-                    activeColor: AppColors.blueBic,
-                  );
+              child: RadioGroup<String>(
+                groupValue: _selectedCountry,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCountry = value;
+                    _showError = false;
+                  });
                 },
+                child: ListView.builder(
+                  itemCount: countries.length,
+                  itemBuilder: (context, index) {
+                    String country = countries[index];
+                    return RadioListTile<String>(
+                      title: Text(
+                        country,
+                        style: GoogleFonts.poppins(fontSize: 16),
+                      ),
+                      value: country,
+                      activeColor: AppColors.blueBic,
+                    );
+                  },
+                ),
               ),
             ),
 
@@ -100,17 +106,17 @@ class _CountrySelectionPageState extends State<CountrySelectionPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _handleNext,
-                      child: Text(
-                        'Suivant',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.blueBic,
                         padding: EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                      ),
+                      child: Text(
+                        'Suivant',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
                   ),

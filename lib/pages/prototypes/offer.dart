@@ -62,7 +62,7 @@ class _OfferPageState extends State<OfferPage> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text("Offre du jour", style: GoogleFonts.poppins()),
+        title: Text("Paniers du jour", style: GoogleFonts.poppins()),
         backgroundColor: AppColors.blueBic,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -98,7 +98,7 @@ class _OfferPageState extends State<OfferPage> {
             ),
             const SizedBox(height: 20),
 
-            // Liste des produits
+            // Liste des paniers
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(
@@ -107,13 +107,11 @@ class _OfferPageState extends State<OfferPage> {
                       final estDisponible =
                           produit['disponibilite'] == "Aujourd’hui";
                       final boutonTexte =
-                          estDisponible ? "Commander" : "Précommander";
+                          estDisponible ? "Réserver" : "Bientôt disponible";
                       final boutonCouleur =
                           estDisponible ? Colors.green : AppColors.blueBic;
                       final boutonIcone =
-                          estDisponible
-                              ? Icons.shopping_bag
-                              : Icons.shopping_cart_outlined;
+                          estDisponible ? Icons.shopping_bag : Icons.schedule;
                       final boutonRoute =
                           estDisponible ? '/commande' : '/precommande';
 
@@ -158,6 +156,27 @@ class _OfferPageState extends State<OfferPage> {
                                                 0.45,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) => Container(
+                                                  height:
+                                                      MediaQuery.of(
+                                                        context,
+                                                      ).size.width *
+                                                      0.45,
+                                                  width: double.infinity,
+                                                  color: const Color(
+                                                    0xFFEFF3EF,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons
+                                                        .image_not_supported_outlined,
+                                                    color: AppColors.blueBic,
+                                                  ),
+                                                ),
                                           ),
                                           Positioned(
                                             right: 12,
@@ -232,7 +251,7 @@ class _OfferPageState extends State<OfferPage> {
                                                       BorderRadius.circular(8),
                                                 ),
                                                 child: Text(
-                                                  "Livraison rapide",
+                                                  "Retrait rapide",
                                                   style: GoogleFonts.poppins(
                                                     color: Colors.green,
                                                     fontWeight: FontWeight.w600,
@@ -256,7 +275,7 @@ class _OfferPageState extends State<OfferPage> {
                                                           "$boutonTexte - ${produit['nom']}",
                                                         ),
                                                         content: Text(
-                                                          "Souhaitez-vous vraiment $boutonTexte ce produit ?",
+                                                          "Souhaitez-vous vraiment $boutonTexte ce panier ?",
                                                         ),
                                                         actions: [
                                                           TextButton(
@@ -273,8 +292,12 @@ class _OfferPageState extends State<OfferPage> {
                                                           ),
                                                           ElevatedButton(
                                                             onPressed: () {
-                                                              Navigator.pop(ctx); // Ferme la dialog
-                                                              context.go(boutonRoute); // Navigue avec go_router
+                                                              Navigator.pop(
+                                                                ctx,
+                                                              ); // Ferme la dialog
+                                                              context.go(
+                                                                boutonRoute,
+                                                              ); // Navigue avec go_router
                                                             },
                                                             style: ElevatedButton.styleFrom(
                                                               backgroundColor:

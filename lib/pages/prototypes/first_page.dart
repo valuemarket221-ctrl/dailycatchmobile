@@ -5,8 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart'; // Pour AppColors.blueBic
 
 class FirstPage extends StatefulWidget {
+  const FirstPage({super.key});
+
   @override
-  _FirstPageState createState() => _FirstPageState();
+  State<FirstPage> createState() => _FirstPageState();
 }
 
 class _FirstPageState extends State<FirstPage>

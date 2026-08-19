@@ -5,8 +5,10 @@ import 'package:myapp/constants.dart';
 import 'home_page.dart';
 
 class GeolocationPage extends StatefulWidget {
+  const GeolocationPage({super.key});
+
   @override
-  _GeolocationPageState createState() => _GeolocationPageState();
+  State<GeolocationPage> createState() => _GeolocationPageState();
 }
 
 class _GeolocationPageState extends State<GeolocationPage> {
@@ -32,6 +34,8 @@ class _GeolocationPageState extends State<GeolocationPage> {
       });
 
       Future.delayed(Duration(seconds: 2), () {
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => HomePage()),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
-/// Page historique des commandes
+/// Page historique des paniers réservés
 class OrdersHistoryPage extends StatefulWidget {
   const OrdersHistoryPage({super.key});
 
@@ -11,35 +13,35 @@ class OrdersHistoryPage extends StatefulWidget {
 }
 
 class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
-  int _selectedFilter = 0; // 0: Tout, 1: En cours, 2: Livré
+  int _selectedFilter = 0; // 0: Tout, 1: En cours, 2: Récupéré
 
-  // Données fictives des commandes
+  // Données fictives des paniers
   final List<Order> _orders = [
     Order(
-      id: 'CMD-001',
+      id: 'DC-001',
       date: DateTime.now().subtract(const Duration(days: 1)),
       status: OrderStatus.delivered,
       total: 45.50,
       items: [
-        OrderItem(name: 'Saumon frais', quantity: 2, price: 25.99),
-        OrderItem(name: 'Crevettes', quantity: 1, price: 15.50),
+        OrderItem(name: 'Panier saumon surprise', quantity: 2, price: 25.99),
+        OrderItem(name: 'Panier crevettes', quantity: 1, price: 15.50),
       ],
     ),
     Order(
-      id: 'CMD-002',
+      id: 'DC-002',
       date: DateTime.now().subtract(const Duration(days: 3)),
       status: OrderStatus.delivered,
       total: 32.00,
-      items: [OrderItem(name: 'Huîtres', quantity: 4, price: 9.99)],
+      items: [OrderItem(name: 'Panier huîtres', quantity: 1, price: 9.99)],
     ),
     Order(
-      id: 'CMD-003',
+      id: 'DC-003',
       date: DateTime.now().subtract(const Duration(days: 5)),
       status: OrderStatus.processing,
       total: 28.50,
       items: [
-        OrderItem(name: 'Thon rouge', quantity: 1, price: 18.00),
-        OrderItem(name: 'Maquereau', quantity: 2, price: 9.00),
+        OrderItem(name: 'Panier thon', quantity: 1, price: 18.00),
+        OrderItem(name: 'Panier maquereau', quantity: 2, price: 9.00),
       ],
     ),
   ];
@@ -55,10 +57,18 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
-        title: Text('Historique des commandes', style: GoogleFonts.poppins()),
-        backgroundColor: AppColors.blueBic,
-        foregroundColor: Colors.white,
+        title: Text(
+          'Historique',
+          style: GoogleFonts.poppins(
+            color: AppColors.blueBic,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.blueBic,
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -71,7 +81,7 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
                 const SizedBox(width: 8),
                 _buildFilterChip('En cours', 1),
                 const SizedBox(width: 8),
-                _buildFilterChip('Livré', 2),
+                _buildFilterChip('Récupéré', 2),
               ],
             ),
           ),
@@ -109,40 +119,55 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
         color: isSelected ? Colors.white : Colors.grey[700],
       ),
       backgroundColor: Colors.grey[200],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected ? AppColors.blueBic : AppTheme.softBorder,
+        ),
+      ),
     );
   }
 
   Widget _buildOrderCard(Order order) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
       child: ExpansionTile(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               order.id,
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                color: AppColors.blueBic,
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color:
                     order.status == OrderStatus.delivered
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : AppTheme.warningColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                order.status == OrderStatus.delivered ? 'Livré' : 'En cours',
+                order.status == OrderStatus.delivered
+                    ? 'Récupéré'
+                    : 'À retirer',
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color:
                       order.status == OrderStatus.delivered
-                          ? Colors.green
-                          : Colors.orange,
+                          ? AppColors.greenTGTG
+                          : AppTheme.warningColor,
                 ),
               ),
             ),
@@ -184,7 +209,7 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => context.push('/order-detail'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.blueBic,
                       shape: RoundedRectangleBorder(
@@ -229,7 +254,7 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
           Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
-            'Aucune commande',
+            'Aucun panier',
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -246,7 +271,7 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
   }
 }
 
-/// Modèle de commande
+/// Modèle de panier réservé
 class Order {
   final String id;
   final DateTime date;
@@ -263,7 +288,7 @@ class Order {
   });
 }
 
-/// Élément de commande
+/// Élément de panier
 class OrderItem {
   final String name;
   final int quantity;
@@ -272,5 +297,5 @@ class OrderItem {
   OrderItem({required this.name, required this.quantity, required this.price});
 }
 
-/// Statut de commande
+/// Statut de panier
 enum OrderStatus { pending, processing, delivered, cancelled }

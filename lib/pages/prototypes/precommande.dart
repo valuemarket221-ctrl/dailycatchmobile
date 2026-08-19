@@ -4,8 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
 class PrecommandePage extends StatefulWidget {
+  const PrecommandePage({super.key});
+
   @override
-  _PrecommandePageState createState() => _PrecommandePageState();
+  State<PrecommandePage> createState() => _PrecommandePageState();
 }
 
 class _PrecommandePageState extends State<PrecommandePage> {
@@ -28,7 +30,7 @@ class _PrecommandePageState extends State<PrecommandePage> {
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
               ),
               content: Text(
-                'Vous recevrez une notification de retrait lorsque votre commande sera prête.',
+                'Vous recevrez une notification dès que ce panier sera prêt au retrait.',
                 style: GoogleFonts.poppins(),
               ),
               actions: [
@@ -60,7 +62,7 @@ class _PrecommandePageState extends State<PrecommandePage> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(
-          "Précommander",
+          "Bientôt disponible",
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         backgroundColor: AppColors.blueBic,
@@ -81,16 +83,24 @@ class _PrecommandePageState extends State<PrecommandePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: selectedCity,
+              initialValue: selectedCity,
+              isExpanded: true,
               hint: Text(
                 "Sélectionnez une ville",
                 style: GoogleFonts.poppins(color: Colors.grey[600]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               items:
                   cities.map((city) {
                     return DropdownMenuItem(
                       value: city,
-                      child: Text(city, style: GoogleFonts.poppins()),
+                      child: Text(
+                        city,
+                        style: GoogleFonts.poppins(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     );
                   }).toList(),
               onChanged: (value) => setState(() => selectedCity = value),
@@ -155,7 +165,7 @@ class _PrecommandePageState extends State<PrecommandePage> {
                     color: Colors.white,
                   ),
                   label: Text(
-                    'Précommander',
+                    'Me prévenir',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

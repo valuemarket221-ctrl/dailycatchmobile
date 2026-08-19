@@ -86,11 +86,18 @@ app.*.map.json
 **/firebase_options.dart
 **/google-services.json
 **/GoogleService-Info.plist
+web/firebase-config.json
 
 # Environment files
 .env
 .env.*
 *.env
+
+# Backend related
+/backend/node_modules/
+/backend/dist/
+/backend/.env
+/backend/.env.*
 
 # Test files
 /coverage/

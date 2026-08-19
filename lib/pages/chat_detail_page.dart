@@ -32,7 +32,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         'heure': '10:00',
       },
       {
-        'texte': 'Je voudrais commander du saumon frais',
+        'texte': 'Je voudrais réserver un panier saumon',
         'envoyeParMoi': true,
         'heure': '10:05',
       },
@@ -65,7 +65,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     if (_messageController.text.trim().isEmpty) return;
 
     final now = TimeOfDay.now();
-    final heure = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final heure =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     setState(() {
       _messages.add({
@@ -88,7 +89,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         final now = TimeOfDay.now();
-        final heure = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        final heure =
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
         setState(() {
           _messages.add({
             'texte': 'Merci pour votre message! Nous vous répondrons sous peu.',
@@ -100,7 +102,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         // Scroll vers le bas après la réponse
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted && _scrollController.hasClients) {
-            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
           }
         });
       }
@@ -142,17 +146,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           IconButton(
             icon: const Icon(Icons.phone, color: AppColors.blueBic),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Appel vocal soon')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Appel vocal soon')));
             },
           ),
           IconButton(
             icon: const Icon(Icons.videocam, color: AppColors.blueBic),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Appel vidéo soon')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Appel vidéo soon')));
             },
           ),
           IconButton(
@@ -235,9 +239,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Widget _buildMessageBubble(Map<String, dynamic> message) {
     final estEnvoyeParMoi = message['envoyeParMoi'] as bool;
     return Align(
-      alignment: estEnvoyeParMoi
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
+      alignment: estEnvoyeParMoi ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -246,14 +248,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
-            bottomLeft: estEnvoyeParMoi ? const Radius.circular(20) : Radius.zero,
-            bottomRight: estEnvoyeParMoi ? Radius.zero : const Radius.circular(20),
+            bottomLeft:
+                estEnvoyeParMoi ? const Radius.circular(20) : Radius.zero,
+            bottomRight:
+                estEnvoyeParMoi ? Radius.zero : const Radius.circular(20),
           ),
         ),
         child: Column(
-          crossAxisAlignment: estEnvoyeParMoi
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              estEnvoyeParMoi
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
           children: [
             Text(
               message['texte'] as String,
@@ -266,9 +271,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             Text(
               message['heure'] as String,
               style: GoogleFonts.poppins(
-                color: estEnvoyeParMoi
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : Colors.grey[500],
+                color:
+                    estEnvoyeParMoi
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : Colors.grey[500],
                 fontSize: 11,
               ),
             ),

@@ -4,8 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
 class ListeProduitsPage extends StatefulWidget {
+  const ListeProduitsPage({super.key});
+
   @override
-  _ListeProduitsPageState createState() => _ListeProduitsPageState();
+  State<ListeProduitsPage> createState() => _ListeProduitsPageState();
 }
 
 class _ListeProduitsPageState extends State<ListeProduitsPage> {
@@ -92,7 +94,7 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                     });
                   },
                   decoration: InputDecoration(
-                    labelText: "Rechercher un produit...",
+                    labelText: "Rechercher un panier...",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -125,7 +127,6 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                               backgroundColor: Colors.white,
                               side: BorderSide(color: AppColors.greenTGTG),
                               onSelected: (selected) {
-                                print('Catégorie sélectionnée: $category');
                                 setState(() {
                                   _selectedCategory = category;
                                 });
@@ -156,7 +157,6 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: () {
-                          print('Produit cliqué: ${produit["nom"]}');
                           context.push('/detail', extra: produit);
                         },
                         child: Column(
@@ -196,7 +196,7 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    "Poids: ${produit["poids"]}",
+                                    "Panier estimé: ${produit["poids"]}",
                                     style: GoogleFonts.poppins(
                                       color: Colors.grey,
                                       fontSize: 14,
@@ -206,7 +206,7 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                                   Row(
                                     children: [
                                       Text(
-                                        "Prix: ",
+                                        "Prix panier: ",
                                         style: GoogleFonts.poppins(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,

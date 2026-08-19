@@ -3,378 +3,211 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
-/// Page Settings - Clone TGTG
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Paramètres',
-          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _notifications = true;
+  bool _emails = false;
+  bool _location = true;
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text, style: GoogleFonts.poppins()),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.blueBic,
       ),
-      body: SingleChildScrollView(
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
         child: Column(
           children: [
-            // Account section
-            _buildSectionTitle('Compte'),
-            _buildSettingItem(
-              Icons.person,
-              'Modifier le profil',
-              'Nom, email, téléphone',
-              () => context.push('/edit-profile'),
-            ),
-            _buildSettingItem(
-              Icons.lock,
-              'Mot de passe',
-              'Changer votre mot de passe',
-              () => context.push('/change-password'),
-            ),
-            _buildSettingItem(
-              Icons.location_on,
-              'Adresses',
-              'Gérer vos adresses',
-              () => context.push('/addresses'),
-            ),
-            _buildSettingItem(
-              Icons.payment,
-              'Moyens de paiement',
-              'Cartes, mobile money',
-              () => context.push('/payment-methods'),
-            ),
-
-            // Notifications section
-            _buildSectionTitle('Notifications'),
-            _buildSwitchItem(
-              Icons.notifications,
-              'Notifications push',
-              'Recevoir des alertes',
-              true,
-            ),
-            _buildSwitchItem(
-              Icons.email,
-              'Emails',
-              'Recevoir des emails promotionnels',
-              false,
-            ),
-
-            // Preferences section
-            _buildSectionTitle('Préférences'),
-            _buildSettingItem(Icons.language, 'Langue', 'Français', () {
-              _showLanguagePicker(context);
-            }),
-            _buildSettingItem(Icons.currency_exchange, 'Devise', 'FCFA', () {
-              _showCurrencyPicker(context);
-            }),
-
-            // About section
-            _buildSectionTitle('À propos'),
-            _buildSettingItem(Icons.info, 'Version', '1.0.0', () {
-              _showVersionDialog(context);
-            }),
-            _buildSettingItem(
-              Icons.rate_review,
-              'Noter l\'application',
-              'Donnez votre avis',
-              () => _showRateAppDialog(context),
-            ),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[500],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingItem(
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.blueBic.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppColors.blueBic, size: 22),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSwitchItem(
-    IconData icon,
-    String title,
-    String subtitle,
-    bool value,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.blueBic.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppColors.blueBic, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
+                IconButton(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                ),
+                const Spacer(),
+                Text('PARAMÈTRES', style: _header),
+                const Spacer(),
+                const SizedBox(width: 48),
               ],
             ),
-          ),
-          Switch(
-            value: value,
-            onChanged: (v) {},
-            activeColor: AppColors.blueBic,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ========== HELPER METHODS ==========
-
-  void _showLanguagePicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            Text('Choisir la langue', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _buildLanguageOption(context, 'Français'),
-            _buildLanguageOption(context, 'English'),
-            _buildLanguageOption(context, 'Español'),
-            const SizedBox(height: 16),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildLanguageOption(BuildContext context, String language) {
-    return ListTile(
-      title: Text(language, style: GoogleFonts.poppins()),
-      trailing: const Icon(Icons.check, color: AppColors.blueBic),
-      onTap: () => Navigator.of(context).pop(),
-    );
-  }
-
-  void _showCurrencyPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            Text('Choisir la devise', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _buildCurrencyOption(context, 'FCFA', 'Franc CFA'),
-            _buildCurrencyOption(context, 'EUR', 'Euro'),
-            _buildCurrencyOption(context, 'USD', 'Dollar US'),
-            const SizedBox(height: 16),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildCurrencyOption(BuildContext context, String code, String name) {
-    return ListTile(
-      title: Text('$code - $name', style: GoogleFonts.poppins()),
-      trailing: const Icon(Icons.check, color: AppColors.blueBic),
-      onTap: () => Navigator.of(context).pop(),
-    );
-  }
-
-  void _showVersionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('À propos', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('DailyCatch', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('Version 1.0.0', style: GoogleFonts.poppins(color: Colors.grey)),
-              const SizedBox(height: 16),
-              Text(
-                'DailyCatch est une application qui vous permet de sauver les produits alimentaires pour réduire le gaspillage.',
-                style: GoogleFonts.poppins(fontSize: 14),
-                textAlign: TextAlign.center,
+            const SizedBox(height: 28),
+            _SwitchRow(
+              icon: Icons.notifications_outlined,
+              title: 'Notifications',
+              subtitle: 'Alertes commandes et offres',
+              value: _notifications,
+              onChanged: (value) => setState(() => _notifications = value),
+            ),
+            _SwitchRow(
+              icon: Icons.email_outlined,
+              title: 'Emails',
+              subtitle: 'Conseils et nouveautés',
+              value: _emails,
+              onChanged: (value) => setState(() => _emails = value),
+            ),
+            _SwitchRow(
+              icon: Icons.location_on_outlined,
+              title: 'Position',
+              subtitle: 'Offres proches de vous',
+              value: _location,
+              onChanged: (value) => setState(() => _location = value),
+            ),
+            _NavRow(
+              icon: Icons.lock_outline,
+              title: 'Mot de passe',
+              subtitle: 'Sécurité du compte',
+              onTap: () => context.push('/change-password'),
+            ),
+            _NavRow(
+              icon: Icons.article_outlined,
+              title: 'Conditions d’utilisation',
+              subtitle: 'CGU DailyCatch',
+              onTap: () => context.push('/terms'),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: () => _message('Préférences enregistrées'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.blueBic,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text('Enregistrer', style: _button),
               ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => _RowShell(
+    icon: icon,
+    title: title,
+    subtitle: subtitle,
+    trailing: Switch(
+      value: value,
+      activeThumbColor: AppColors.blueBic,
+      onChanged: onChanged,
+    ),
+  );
+}
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: _RowShell(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailing: const Icon(Icons.chevron_right, color: Color(0xFF9AA8AA)),
+    ),
+  );
+}
+
+class _RowShell extends StatelessWidget {
+  const _RowShell({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 72,
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xFFE8EEEE))),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: const Color(0xFF526669), size: 22),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: _title),
+              const SizedBox(height: 4),
+              Text(subtitle, style: _subtitle),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('OK', style: GoogleFonts.poppins(color: AppColors.blueBic)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showRateAppDialog(BuildContext context) {
-    int _selectedRating = 0;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Noter l\'application', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.star, size: 48, color: Colors.amber),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Avez-vous aimé DailyCatch ?\nDonnez-nous votre avis !',
-                    style: GoogleFonts.poppins(fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < _selectedRating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _selectedRating = index + 1;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Plus tard', style: GoogleFonts.poppins(color: Colors.grey)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.blueBic),
-                  onPressed: () {
-                    if (_selectedRating > 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppColors.blueBic,
-                          content: Text(
-                            'Merci pour votre note de $_selectedRating étoile${_selectedRating > 1 ? 's' : ''} !',
-                            style: GoogleFonts.poppins(color: Colors.white),
-                          ),
-                        ),
-                      );
-                    }
-                    Navigator.pop(context);
-                  },
-                  child: Text('Noter', style: GoogleFonts.poppins(color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+        ),
+        trailing,
+      ],
+    ),
+  );
 }
+
+final _header = GoogleFonts.poppins(
+  fontSize: 15,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _title = GoogleFonts.poppins(
+  fontSize: 13,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _subtitle = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w600,
+  color: const Color(0xFF526669),
+);
+final _button = GoogleFonts.poppins(
+  fontSize: 12,
+  fontWeight: FontWeight.w900,
+  color: Colors.white,
+);

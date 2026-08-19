@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/support_api_service.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Page des notifications
 class NotificationsPage extends StatefulWidget {
@@ -11,24 +13,27 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
+  final SupportApiService _supportApiService = SupportApiService();
   bool _promotionsEnabled = true;
   bool _ordersEnabled = true;
   bool _reservationsEnabled = true;
   bool _newsEnabled = false;
+  bool _isLoadingPreferences = true;
+  bool _isSavingPreferences = false;
 
   final List<NotificationItem> _notifications = [
     NotificationItem(
       id: '1',
       title: 'Nouvelle offre disponible',
-      message: 'Découvrez nos sacs de crevettes à -50%!',
+      message: 'Un panier crevettes est disponible à -50% près de vous.',
       date: DateTime.now().subtract(const Duration(hours: 2)),
       isRead: false,
       type: NotificationType.promotion,
     ),
     NotificationItem(
       id: '2',
-      title: 'Votre commande est en route',
-      message: 'Votre commande CMD-003 sera livrée demain.',
+      title: 'Panier confirmé',
+      message: 'Votre réservation DC-003 est prête pour le retrait demain.',
       date: DateTime.now().subtract(const Duration(days: 1)),
       isRead: false,
       type: NotificationType.order,
@@ -36,7 +41,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     NotificationItem(
       id: '3',
       title: 'Rappel de récupération',
-      message: 'N\'oubliez pas de récupérer votre réservation avant 18h!',
+      message: 'N\'oubliez pas de récupérer votre panier avant 18h.',
       date: DateTime.now().subtract(const Duration(days: 2)),
       isRead: true,
       type: NotificationType.reservation,
@@ -44,16 +49,33 @@ class _NotificationsPageState extends State<NotificationsPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadNotificationPreferences();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: AppTheme.mutedSurface,
         appBar: AppBar(
-          title: Text('Notifications', style: GoogleFonts.poppins()),
-          backgroundColor: AppColors.blueBic,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            tabs: [Tab(text: 'Notifications'), Tab(text: 'Préférences')],
+          title: Text(
+            'Notifications',
+            style: GoogleFonts.poppins(
+              color: AppColors.blueBic,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.blueBic,
+          elevation: 0,
+          bottom: TabBar(
+            labelColor: AppColors.blueBic,
+            unselectedLabelColor: Colors.grey[600],
+            indicatorColor: AppColors.greenTGTG,
+            tabs: const [Tab(text: 'Alertes'), Tab(text: 'Préférences')],
           ),
         ),
         body: TabBarView(
@@ -96,13 +118,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ),
         );
       },
-      child: Card(
+      child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color:
-            notification.isRead
-                ? Colors.white
-                : AppColors.blueBic.withOpacity(0.05),
+        decoration: BoxDecoration(
+          color:
+              notification.isRead
+                  ? Colors.white
+                  : AppColors.blueBic.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.softBorder),
+          boxShadow: AppTheme.shadowSm,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -113,7 +139,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 decoration: BoxDecoration(
                   color: _getNotificationColor(
                     notification.type,
-                  ).withOpacity(0.1),
+                  ).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -145,7 +171,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             width: 8,
                             height: 8,
                             decoration: const BoxDecoration(
-                              color: Colors.blue,
+                              color: AppColors.greenTGTG,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -182,7 +208,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          'Notifications push',
+          'Alertes DailyCatch',
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -190,53 +216,51 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildSwitchTile(
-          title: 'Promotions et offres',
-          subtitle: 'Recevez des alertes sur les nouvelles offres',
-          value: _promotionsEnabled,
-          onChanged: (value) {
-            setState(() => _promotionsEnabled = value);
-          },
-        ),
-        _buildSwitchTile(
-          title: 'Commandes',
-          subtitle: 'Suivi de vos commandes et livraison',
-          value: _ordersEnabled,
-          onChanged: (value) {
-            setState(() => _ordersEnabled = value);
-          },
-        ),
-        _buildSwitchTile(
-          title: 'Réservations',
-          subtitle: 'Rappels pour récupérer vos produits',
-          value: _reservationsEnabled,
-          onChanged: (value) {
-            setState(() => _reservationsEnabled = value);
-          },
-        ),
-        _buildSwitchTile(
-          title: 'Actualités',
-          subtitle: 'Dernières nouvelles de l\'application',
-          value: _newsEnabled,
-          onChanged: (value) {
-            setState(() => _newsEnabled = value);
-          },
-        ),
+        if (_isLoadingPreferences)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else ...[
+          _buildSwitchTile(
+            title: 'Paniers proches',
+            subtitle: 'Recevoir les nouveaux paniers autour de vous',
+            value: _promotionsEnabled,
+            onChanged: (value) {
+              setState(() => _promotionsEnabled = value);
+            },
+          ),
+          _buildSwitchTile(
+            title: 'Réservations',
+            subtitle: 'Confirmation, paiement et code de retrait',
+            value: _ordersEnabled,
+            onChanged: (value) {
+              setState(() => _ordersEnabled = value);
+            },
+          ),
+          _buildSwitchTile(
+            title: 'Réservations',
+            subtitle: 'Rappels pour récupérer vos paniers',
+            value: _reservationsEnabled,
+            onChanged: (value) {
+              setState(() => _reservationsEnabled = value);
+            },
+          ),
+          _buildSwitchTile(
+            title: 'Actualités',
+            subtitle: 'Dernières nouvelles de l\'application',
+            value: _newsEnabled,
+            onChanged: (value) {
+              setState(() => _newsEnabled = value);
+            },
+          ),
+        ],
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Préférences enregistrées',
-                    style: GoogleFonts.poppins(),
-                  ),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
+            onPressed:
+                _isSavingPreferences ? null : _saveNotificationPreferences,
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.blueBic,
               side: const BorderSide(color: AppColors.blueBic),
@@ -246,12 +270,69 @@ class _NotificationsPageState extends State<NotificationsPage> {
               ),
             ),
             child: Text(
-              'Enregistrer',
+              _isSavingPreferences ? 'Enregistrement...' : 'Enregistrer',
               style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _saveNotificationPreferences() async {
+    setState(() => _isSavingPreferences = true);
+    final pushEnabled =
+        _promotionsEnabled ||
+        _ordersEnabled ||
+        _reservationsEnabled ||
+        _newsEnabled;
+
+    try {
+      await _supportApiService.updateNotificationPreferences(
+        nearbyOffersEnabled: _promotionsEnabled,
+        ordersEnabled: _ordersEnabled,
+        pickupRemindersEnabled: _reservationsEnabled,
+        newsEnabled: _newsEnabled,
+      );
+      await _supportApiService.updatePushNotificationsEnabled(pushEnabled);
+      if (!mounted) return;
+      _showPreferenceMessage('Préférences enregistrées');
+    } catch (_) {
+      if (!mounted) return;
+      _showPreferenceMessage(
+        'Impossible d’enregistrer les préférences.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingPreferences = false);
+      }
+    }
+  }
+
+  Future<void> _loadNotificationPreferences() async {
+    try {
+      final preferences = await _supportApiService.getNotificationPreferences();
+      if (!mounted) return;
+      setState(() {
+        _promotionsEnabled = preferences.nearbyOffersEnabled;
+        _ordersEnabled = preferences.ordersEnabled;
+        _reservationsEnabled = preferences.pickupRemindersEnabled;
+        _newsEnabled = preferences.newsEnabled;
+        _isLoadingPreferences = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingPreferences = false);
+    }
+  }
+
+  void _showPreferenceMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.poppins()),
+        backgroundColor: isError ? Colors.red.shade700 : AppColors.greenTGTG,
+      ),
     );
   }
 
@@ -261,9 +342,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -289,7 +375,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: AppColors.blueBic,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppColors.blueBic,
             ),
           ],
         ),
@@ -320,11 +407,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Color _getNotificationColor(NotificationType type) {
     switch (type) {
       case NotificationType.promotion:
-        return Colors.purple;
+        return AppColors.greenTGTG;
       case NotificationType.order:
         return AppColors.blueBic;
       case NotificationType.reservation:
-        return Colors.orange;
+        return AppTheme.warningColor;
     }
   }
 

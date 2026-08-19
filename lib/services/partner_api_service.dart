@@ -1,0 +1,369 @@
+import 'package:http/http.dart' as http;
+import 'package:myapp/services/backend_api_client.dart';
+
+class PartnerOfferRequest {
+  const PartnerOfferRequest({
+    required this.storeId,
+    required this.storeName,
+    required this.name,
+    required this.unitAmount,
+    required this.availableQuantity,
+    this.description,
+    this.category,
+    this.weightEstimate,
+    this.currency = 'xof',
+    this.originalUnitAmount,
+    this.pickupStartsAt,
+    this.pickupEndsAt,
+    this.latitude,
+    this.longitude,
+    this.mediaUrls = const [],
+    this.pickupSlots = const [],
+    this.active = true,
+  });
+
+  final String storeId;
+  final String storeName;
+  final String name;
+  final String? description;
+  final String? category;
+  final String? weightEstimate;
+  final String currency;
+  final int unitAmount;
+  final int? originalUnitAmount;
+  final int availableQuantity;
+  final DateTime? pickupStartsAt;
+  final DateTime? pickupEndsAt;
+  final double? latitude;
+  final double? longitude;
+  final List<String> mediaUrls;
+  final List<Map<String, dynamic>> pickupSlots;
+  final bool active;
+
+  Map<String, dynamic> toJson() => {
+    'storeId': storeId,
+    'storeName': storeName,
+    'name': name,
+    if (description != null && description!.isNotEmpty)
+      'description': description,
+    if (category != null && category!.isNotEmpty) 'category': category,
+    if (weightEstimate != null && weightEstimate!.isNotEmpty)
+      'weightEstimate': weightEstimate,
+    'currency': currency,
+    'unitAmount': unitAmount,
+    if (originalUnitAmount != null) 'originalUnitAmount': originalUnitAmount,
+    'availableQuantity': availableQuantity,
+    if (pickupStartsAt != null)
+      'pickupStartsAt': pickupStartsAt!.toUtc().toIso8601String(),
+    if (pickupEndsAt != null)
+      'pickupEndsAt': pickupEndsAt!.toUtc().toIso8601String(),
+    if (latitude != null) 'latitude': latitude,
+    if (longitude != null) 'longitude': longitude,
+    'mediaUrls': mediaUrls,
+    'pickupSlots': pickupSlots,
+    'active': active,
+  };
+}
+
+class PartnerProfileRequest {
+  const PartnerProfileRequest({
+    required this.storeId,
+    required this.storeName,
+    this.ownerName,
+    this.commerceType = 'fishmonger',
+    this.address,
+    this.city,
+    this.postalCode,
+    this.phone,
+    this.email,
+    this.description,
+    this.openingHours = const {},
+    this.latitude,
+    this.longitude,
+  });
+
+  final String storeId;
+  final String storeName;
+  final String? ownerName;
+  final String commerceType;
+  final String? address;
+  final String? city;
+  final String? postalCode;
+  final String? phone;
+  final String? email;
+  final String? description;
+  final Map<String, String> openingHours;
+  final double? latitude;
+  final double? longitude;
+
+  Map<String, dynamic> toJson() => {
+    'storeId': storeId,
+    'storeName': storeName,
+    if (ownerName != null && ownerName!.isNotEmpty) 'ownerName': ownerName,
+    'commerceType': commerceType,
+    if (address != null && address!.isNotEmpty) 'address': address,
+    if (city != null && city!.isNotEmpty) 'city': city,
+    if (postalCode != null && postalCode!.isNotEmpty) 'postalCode': postalCode,
+    if (phone != null && phone!.isNotEmpty) 'phone': phone,
+    if (email != null && email!.isNotEmpty) 'email': email,
+    if (description != null && description!.isNotEmpty)
+      'description': description,
+    'openingHours': openingHours,
+    if (latitude != null) 'latitude': latitude,
+    if (longitude != null) 'longitude': longitude,
+  };
+}
+
+class PartnerApiService {
+  PartnerApiService({
+    http.Client? client,
+    String? baseUrl,
+    BackendApiClient? api,
+  }) : _api = api ?? BackendApiClient(client: client, baseUrl: baseUrl);
+
+  final BackendApiClient _api;
+
+  Future<String> createOffer(PartnerOfferRequest request) async {
+    final body = await _postJson('/api/v1/partner/offers', request.toJson());
+    return body['offerId'] as String;
+  }
+
+  Future<Map<String, dynamic>> updateOffer(
+    String offerId,
+    Map<String, dynamic> updates,
+  ) async {
+    final body = await _patchJson('/api/v1/partner/offers/$offerId', updates);
+    return body['offer'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> setOfferActive(String offerId, bool active) {
+    return updateOffer(offerId, {'active': active});
+  }
+
+  Future<Map<String, dynamic>> deleteOffer(String offerId) async {
+    final body = await _deleteJson('/api/v1/partner/offers/$offerId');
+    return body['offer'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>?> getMyProfile() async {
+    final body = await _getJson('/api/v1/partner/profile/me');
+    return body['profile'] as Map<String, dynamic>?;
+  }
+
+  Future<Map<String, dynamic>> saveMyProfile(
+    PartnerProfileRequest request,
+  ) async {
+    final body = await _putJson('/api/v1/partner/profile/me', request.toJson());
+    return body['profile'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createDocumentUploadIntent({
+    required String documentType,
+    required String fileName,
+    required String contentType,
+    required int sizeBytes,
+  }) async {
+    return _postJson('/api/v1/partner/documents/upload-intent', {
+      'documentType': documentType,
+      'fileName': fileName,
+      'contentType': contentType,
+      'sizeBytes': sizeBytes,
+    });
+  }
+
+  Future<String> uploadDocumentBytes({
+    required String documentType,
+    required String fileName,
+    required String contentType,
+    required List<int> bytes,
+  }) async {
+    final intent = await createDocumentUploadIntent(
+      documentType: documentType,
+      fileName: fileName,
+      contentType: contentType,
+      sizeBytes: bytes.length,
+    );
+    return _uploadBytesFromIntent(
+      intent: intent,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getMyDocuments() async {
+    final body = await _getJson('/api/v1/partner/documents/me');
+    return (body['documents'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createOfferMediaUploadIntent({
+    required String fileName,
+    required String contentType,
+    required int sizeBytes,
+    String? offerId,
+  }) async {
+    return _postJson('/api/v1/partner/offer-media/upload-intent', {
+      'fileName': fileName,
+      'contentType': contentType,
+      'sizeBytes': sizeBytes,
+      if (offerId != null) 'offerId': offerId,
+    });
+  }
+
+  Future<String> uploadOfferMediaBytes({
+    required String fileName,
+    required String contentType,
+    required List<int> bytes,
+    String? offerId,
+  }) async {
+    final intent = await createOfferMediaUploadIntent(
+      fileName: fileName,
+      contentType: contentType,
+      sizeBytes: bytes.length,
+      offerId: offerId,
+    );
+    return _uploadBytesFromIntent(
+      intent: intent,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getStoreOffers(String storeId) async {
+    final body = await _getJson('/api/v1/partner/stores/$storeId/offers');
+    return (body['offers'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getStoreReservations(
+    String storeId,
+  ) async {
+    final body = await _getJson('/api/v1/partner/stores/$storeId/reservations');
+    return (body['reservations'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getStorePickups(String storeId) async {
+    final body = await _getJson('/api/v1/partner/stores/$storeId/pickups');
+    return (body['pickups'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getStorePromotions(String storeId) async {
+    final body = await _getJson('/api/v1/partner/stores/$storeId/promotions');
+    return (body['promotions'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<String> createPromotion(Map<String, dynamic> request) async {
+    final body = await _postJson('/api/v1/partner/promotions', request);
+    return body['promotionId'] as String;
+  }
+
+  Future<Map<String, dynamic>> updatePromotion(
+    String promotionId,
+    Map<String, dynamic> updates,
+  ) async {
+    final body = await _patchJson(
+      '/api/v1/partner/promotions/$promotionId',
+      updates,
+    );
+    return body['promotion'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> setPromotionActive(
+    String promotionId,
+    bool active,
+  ) {
+    return updatePromotion(promotionId, {'active': active});
+  }
+
+  Future<Map<String, dynamic>> _getJson(String path) async {
+    try {
+      return await _api.get(path);
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      return await _api.post(path, body: payload);
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> _putJson(
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      return await _api.put(path, body: payload);
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> _patchJson(
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      return await _api.patch(path, body: payload);
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> _deleteJson(String path) async {
+    try {
+      return await _api.delete(path);
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+
+  Future<String> _uploadBytesFromIntent({
+    required Map<String, dynamic> intent,
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final upload = intent['upload'] as Map<String, dynamic>?;
+    final uploadUrl = upload?['url'] as String?;
+    if (uploadUrl == null || uploadUrl.isEmpty) {
+      throw const PartnerApiException(
+        statusCode: 500,
+        message: 'upload_url_missing',
+      );
+    }
+
+    try {
+      final body = await _api.putBytes(
+        uploadUrl,
+        bytes: bytes,
+        contentType: contentType,
+      );
+      return body['storageUrl'] as String? ??
+          intent['storageUrl'] as String? ??
+          uploadUrl;
+    } on BackendApiException catch (error) {
+      throw PartnerApiException.fromBackend(error);
+    }
+  }
+}
+
+class PartnerApiException implements Exception {
+  const PartnerApiException({required this.statusCode, required this.message});
+
+  factory PartnerApiException.fromBackend(BackendApiException error) {
+    return PartnerApiException(
+      statusCode: error.statusCode,
+      message: error.code,
+    );
+  }
+
+  final int statusCode;
+  final String message;
+
+  @override
+  String toString() => 'PartnerApiException($statusCode): $message';
+}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 class LegalPage extends StatefulWidget {
   const LegalPage({super.key});
@@ -29,21 +30,21 @@ Les présentes Conditions Générales d'Utilisation (CGU) régissent l'utilisati
 
 **2. Description du service**
 
-DailyCatch est une plateforme permettant aux utilisateurs de commander des produits alimentaires auprès de commerces partenaires à des prix réduits, afin de lutter contre le gaspillage alimentaire.
+DailyCatch est une plateforme permettant aux utilisateurs de réserver des paniers alimentaires auprès de commerces partenaires à prix réduit, afin de lutter contre le gaspillage alimentaire.
 
 **3. Inscription et compte utilisateur**
 
 Pour utiliser DailyCatch, vous devez créer un compte en fournissant des informations valides. Vous êtes responsable de la confidentialité de votre mot de passe.
 
-**4. Commandes et paiements**
+**4. Réservations et paiements**
 
-- Les commandes sont passées via l'application
-- Le paiement s'effectue en ligne au moment de la commande
+- Les réservations sont passées via l'application
+- Le paiement s'effectue en ligne au moment de la réservation
 - Les prix indiqués sont ceux pratiqués par les commerces partenaires
 
-**5. Retrait des commandes**
+**5. Retrait des paniers**
 
-Vous devez récupérer votre commande pendant les horaires indiqués. En cas de non-retrait, aucun remboursement ne sera effectué.
+Vous devez récupérer votre panier pendant les horaires indiqués. En cas de non-retrait, aucun remboursement ne sera effectué.
 
 **6. Droit de rétractation**
 
@@ -84,14 +85,14 @@ Nous collectons les informations suivantes :
 
 Vos données sont utilisées pour :
 - Créer et gérer votre compte
-- Traiter vos commandes
+- Traiter vos réservations
 - Améliorer nos services
 - Vous envoyer des notifications (avec votre consentement)
 
 **4. Partage des données**
 
 Nous partageons vos données avec :
-- Les commerces partenaires (pour traiter vos commandes)
+- Les commerces partenaires (pour traiter vos réservations)
 - Nos prestataires de paiement (sécurisés)
 - Les autorités légales (si requis par la loi)
 
@@ -164,13 +165,12 @@ Pour toute question : contact@dailycatch.fr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -178,7 +178,7 @@ Pour toute question : contact@dailycatch.fr
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: AppColors.blueBic,
           ),
         ),
       ),
@@ -188,8 +188,10 @@ Pour toute question : contact@dailycatch.fr
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.softBorder),
+              boxShadow: AppTheme.shadowSm,
             ),
             child: Row(
               children:
@@ -237,8 +239,17 @@ Pour toute question : contact@dailycatch.fr
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: _buildMarkdownContent(
-                content[tabs[_selectedTab]['file']]!,
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.softBorder),
+                  boxShadow: AppTheme.shadowSm,
+                ),
+                child: _buildMarkdownContent(
+                  content[tabs[_selectedTab]['file']]!,
+                ),
               ),
             ),
           ),

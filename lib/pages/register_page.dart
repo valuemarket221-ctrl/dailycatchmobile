@@ -64,10 +64,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         title: Text(
           'Creer un compte',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
@@ -86,11 +83,8 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Creez votre compte pour commencer a sauver des produits',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              'Creez votre compte pour commencer a sauver des paniers',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),
             Form(
@@ -108,7 +102,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                     ),
                     validator: (value) {
                       if (value!.isEmpty) return 'Nom requis';
@@ -128,7 +125,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                     ),
                     validator: (value) {
                       if (value!.isEmpty) return 'Email requis';
@@ -145,7 +145,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       prefixIcon: const Icon(Icons.lock, color: Colors.grey),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureText ? Icons.visibility_off : Icons.visibility,
+                          _obscureText
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: Colors.grey,
                         ),
                         onPressed: _togglePasswordVisibility,
@@ -156,7 +158,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                     ),
                     validator: (value) {
                       if (value!.isEmpty) return 'Mot de passe requis';
@@ -177,21 +182,32 @@ class _RegisterPageState extends State<RegisterPage> {
                     height: 20,
                     margin: const EdgeInsets.only(right: 10),
                     decoration: BoxDecoration(
-                      color: _agreedToTerms ? AppColors.blueBic : Colors.transparent,
+                      color:
+                          _agreedToTerms
+                              ? AppColors.blueBic
+                              : Colors.transparent,
                       border: Border.all(
                         color: _agreedToTerms ? AppColors.blueBic : Colors.grey,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: _agreedToTerms
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
+                    child:
+                        _agreedToTerms
+                            ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                            : null,
                   ),
                   Expanded(
                     child: Text.rich(
                       TextSpan(
                         text: 'J\'accepte les ',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                         children: [
                           TextSpan(
                             text: 'Conditions Generales',
@@ -203,7 +219,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                           TextSpan(
                             text: ' et la ',
-                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
                           ),
                           TextSpan(
                             text: 'Politique de confidentialite',
@@ -232,23 +251,24 @@ class _RegisterPageState extends State<RegisterPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
+                child:
+                    _isLoading
+                        ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                        : Text(
+                          'Creer mon compte',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      )
-                    : Text(
-                        'Creer mon compte',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
               ),
             ),
             const SizedBox(height: 24),

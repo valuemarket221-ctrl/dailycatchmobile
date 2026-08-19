@@ -8,6 +8,8 @@ class AProposPage extends StatelessWidget {
   // Lien du site web
   final Uri _url = Uri.parse('https://dailycatch.app');
 
+  AProposPage({super.key});
+
   // Fonction pour ouvrir l'URL
   void _openWebsite() async {
     if (await canLaunchUrl(_url)) {
@@ -47,7 +49,7 @@ class AProposPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'DailyCatch est une plateforme innovante de livraison de poissons et fruits de mer. Nous connectons les consommateurs avec les meilleurs fournisseurs locaux, offrant une solution rapide, fiable et respectueuse de l\'environnement.',
+              'DailyCatch connecte les consommateurs avec des commerces locaux qui proposent des paniers surprise de poissons et fruits de mer à prix réduit, pour réduire le gaspillage alimentaire.',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 color: Colors.grey[800],
@@ -68,7 +70,7 @@ class AProposPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Notre mission est de rendre l\'accès aux produits de la mer frais facile, rapide et abordable pour tous. Nous souhaitons aussi offrir une expérience utilisateur fluide à chaque étape, de la commande à la livraison.',
+              'Notre mission est de simplifier la réservation de paniers de la mer à récupérer sur créneau court, avec une expérience fluide de la découverte au retrait.',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 color: Colors.grey[800],
@@ -89,7 +91,7 @@ class AProposPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Peter et son équipe sont les fondateurs de DailyCatch. Leur objectif est de transformer la manière dont les consommateurs achètent des produits de la mer tout en soutenant les pêcheurs et producteurs locaux.',
+              'Peter et son équipe ont créé DailyCatch pour aider les commerces à valoriser leurs invendus tout en rendant les paniers de la mer plus accessibles.',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 color: Colors.grey[800],

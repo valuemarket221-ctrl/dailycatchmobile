@@ -17,8 +17,10 @@ class Client {
 }
 
 class ClientsPage extends StatefulWidget {
+  const ClientsPage({super.key});
+
   @override
-  _ClientsPageState createState() => _ClientsPageState();
+  State<ClientsPage> createState() => _ClientsPageState();
 }
 
 class _ClientsPageState extends State<ClientsPage> {
@@ -27,7 +29,7 @@ class _ClientsPageState extends State<ClientsPage> {
     (index) => Client(
       name: 'Client $index',
       email: 'client$index@example.com',
-      phone: '77${index}00123${index}',
+      phone: '77${index}00123$index',
     ),
   );
 

@@ -1,253 +1,228 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/utils/local_auth_session.dart';
+import 'package:myapp/utils/profile_photo_store.dart';
+import 'package:myapp/widgets/bottom_nav_bar.dart';
 
-/// Page Profile - Clone TGTG
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  @override
+  void initState() {
+    super.initState();
+    ProfilePhotoStore.load();
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    await LocalAuthSession.signOut();
+    if (context.mounted) context.go('/login');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final items = [
+      (Icons.calendar_month_outlined, 'Mes réservations', '/pickup'),
+      (Icons.favorite_border, 'Mes favoris', '/favorites'),
+      (Icons.location_on_outlined, 'Mes adresses', '/addresses'),
+      (Icons.info_outline, 'Mes informations', '/edit-profile'),
+      (Icons.credit_card_outlined, 'Paiement', '/payment-methods'),
+      (Icons.settings_outlined, 'Paramètres', '/settings'),
+      (Icons.help_outline, 'Aide & support', '/help'),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.go('/home'),
-        ),
-        title: Text(
-          'Mon profil',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            // Profile header
-            Column(
-              children: [
-                // Avatar
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.blueBic,
-                      width: 3,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(26, 26, 26, 0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mon profil', style: _title),
+                    const SizedBox(height: 24),
+                    _ProfileHeader(
+                      onTapProfile: () => context.push('/edit-profile'),
+                      onTapNotifications: () => context.push('/notifications'),
                     ),
-                  ),
-                  child: const CircleAvatar(
-                    radius: 47,
-                    backgroundColor: Colors.grey,
-                    child: Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Colors.white,
+                    const SizedBox(height: 30),
+                    for (final item in items)
+                      _ProfileRow(
+                        icon: item.$1,
+                        label: item.$2,
+                        onTap: () => context.push(item.$3),
+                      ),
+                    const SizedBox(height: 8),
+                    _ProfileRow(
+                      icon: Icons.logout,
+                      label: 'Se déconnecter',
+                      onTap: () => _logout(context),
+                      showChevron: false,
                     ),
-                  ),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: Text('DailyCatch Sénégal', style: _footer),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                // Name
-                Text(
-                  'Ibrahima Aidara',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Email
-                Text(
-                  'ibrahima@email.com',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Stats card
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.blueBic, AppColors.blueBic.withOpacity(0.8)],
-                ),
-                borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem(Icons.shopping_bag, '12', 'Sauvés'),
-                  _buildStatItem(Icons.savings, '89€', 'Économisés'),
-                  _buildStatItem(Icons.eco, '15kg', 'CO₂'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Menu items
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildMenuItem(
-                    Icons.qr_code_2,
-                    'Mes sauvés',
-                    'Vos réservations avec QR code',
-                    () => context.push('/pickup'),
-                  ),
-                  _buildMenuItem(
-                    Icons.history,
-                    'Historique des commandes',
-                    'Voir vos anciennes commandes',
-                    () => context.push('/orders'),
-                  ),
-                  _buildMenuItem(
-                    Icons.favorite,
-                    'Favoris',
-                    'Vos boutiques préférées',
-                    () => context.push('/favorites'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Help section
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildMenuItem(
-                    Icons.help_outline,
-                    'Aide & FAQ',
-                    'Questions fréquentes',
-                    () => context.push('/help'),
-                  ),
-                  _buildMenuItem(
-                    Icons.description,
-                    'Conditions générales',
-                    'Mentions légales',
-                    () => context.push('/legal'),
-                  ),
-                  _buildMenuItem(
-                    Icons.logout,
-                    'Déconnexion',
-                    'Se déconnecter du compte',
-                    () => context.go('/login'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+            );
+          },
         ),
       ),
+      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
     );
   }
+}
 
-  Widget _buildStatItem(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 28),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.onTapProfile,
+    required this.onTapNotifications,
+  });
+
+  final VoidCallback onTapProfile;
+  final VoidCallback onTapNotifications;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: InkWell(
+          onTap: onTapProfile,
+          borderRadius: BorderRadius.circular(18),
+          child: Row(
+            children: [
+              const _ProfileAvatar(),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Amadou Fall', style: _name),
+                    Text('Voir mon profil', style: _sub),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            color: Colors.white.withOpacity(0.8),
+      ),
+      InkWell(
+        onTap: onTapNotifications,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F8F7),
+            borderRadius: BorderRadius.circular(21),
           ),
+          child: Text('2', style: _name),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  Widget _buildMenuItem(IconData icon, String title, String subtitle, VoidCallback onTap) {
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar();
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<Uint8List?>(
+    valueListenable: ProfilePhotoStore.bytes,
+    builder:
+        (context, bytes, _) => ValueListenableBuilder<String>(
+          valueListenable: ProfilePhotoStore.asset,
+          builder:
+              (context, asset, _) => CircleAvatar(
+                radius: 34,
+                backgroundImage:
+                    bytes == null
+                        ? AssetImage(asset) as ImageProvider
+                        : MemoryImage(bytes),
+                backgroundColor: const Color(0xFFE8F4F2),
+              ),
+        ),
+  );
+}
+
+class _ProfileRow extends StatelessWidget {
+  const _ProfileRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.showChevron = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Container(
+        height: 47,
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFE8EEEE))),
+        ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.blueBic.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppColors.blueBic, size: 24),
-            ),
+            Icon(icon, color: const Color(0xFF526669), size: 19),
             const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
+            Expanded(child: Text(label, style: _row)),
+            if (showChevron)
+              const Icon(
+                Icons.chevron_right,
+                color: Color(0xFF9AA8AA),
+                size: 19,
               ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
     );
   }
 }
+
+final _title = GoogleFonts.poppins(
+  fontSize: 21,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _name = GoogleFonts.poppins(
+  fontSize: 13.5,
+  fontWeight: FontWeight.w900,
+  color: const Color(0xFF142D31),
+);
+final _sub = GoogleFonts.poppins(
+  fontSize: 10.5,
+  fontWeight: FontWeight.w700,
+  color: AppColors.greenTGTG,
+);
+final _row = GoogleFonts.poppins(
+  fontSize: 12.5,
+  fontWeight: FontWeight.w800,
+  color: const Color(0xFF263B3E),
+);
+final _footer = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFF8BA0A3),
+);

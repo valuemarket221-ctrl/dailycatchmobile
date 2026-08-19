@@ -59,7 +59,7 @@ class _DashboardPageState extends State<DashboardPage> {
               () {},
             ),
 
-            _buildSectionTitle('Gestion Produits'),
+            _buildSectionTitle('Gestion Paniers'),
             _buildDrawerItem(
               Icons.add_box,
               'Ajouter / Modifier / Supprimer',
@@ -67,14 +67,14 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             _buildDrawerItem(
               Icons.inventory_2,
-              'Produits proposés par admin',
+              'Paniers proposés par admin',
               () {},
             ),
 
-            _buildSectionTitle('Commandes'),
+            _buildSectionTitle('Réservations'),
             _buildDrawerItem(
-              Icons.local_shipping,
-              'Suivi global des commandes',
+              Icons.qr_code_scanner,
+              'Suivi global des retraits',
               () {},
             ),
             _buildDrawerItem(Icons.history, 'Statut & Historique', () {}),
@@ -96,7 +96,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             _buildDrawerItem(
               Icons.trending_up,
-              'Produits les plus vendus',
+              'Paniers les plus sauvés',
               () {},
             ),
             _buildDrawerItem(
@@ -155,8 +155,8 @@ class _DashboardPageState extends State<DashboardPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStatCard('Ventes', '123', Colors.green),
-                  _buildStatCard('Commandes', '45', Colors.blue),
+                  _buildStatCard('Paniers sauvés', '123', Colors.green),
+                  _buildStatCard('Réservations', '45', Colors.blue),
                   _buildStatCard('Paiements', '678', Colors.orange),
                 ],
               ),
@@ -165,7 +165,7 @@ class _DashboardPageState extends State<DashboardPage> {
               // Graphiques ou d'autres sections dynamiques ici
               Card(
                 elevation: 3,
-                color: Colors.blueAccent.withOpacity(0.1),
+                color: Colors.blueAccent.withValues(alpha: 0.1),
                 child: ListTile(
                   title: Text(
                     'Graphique des ventes',
@@ -187,7 +187,7 @@ class _DashboardPageState extends State<DashboardPage> {
               // Autres sections de données
               Card(
                 elevation: 3,
-                color: Colors.yellow.withOpacity(0.1),
+                color: Colors.yellow.withValues(alpha: 0.1),
                 child: ListTile(
                   title: Text(
                     'Notifications récentes',
@@ -216,7 +216,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildStatCard(String title, String value, Color color) {
     return Card(
       elevation: 5,
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -266,7 +266,7 @@ class _DashboardPageState extends State<DashboardPage> {
       leading: Icon(icon, color: AppColors.blueBic),
       title: Text(title, style: GoogleFonts.poppins()),
       onTap: onTap,
-      hoverColor: Colors.indigo.withOpacity(0.1),
+      hoverColor: Colors.indigo.withValues(alpha: 0.1),
     );
   }
 }

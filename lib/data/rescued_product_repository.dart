@@ -1,21 +1,40 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:myapp/models/rescued_product.dart';
+import 'package:myapp/services/product_offer_api_service.dart';
 
 /// Repository pour gérer les opérations sur les produits "sauvés"
 /// Couche d'abstraction entre l'application et Firebase Firestore
 class RescuedProductRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  RescuedProductRepository({ProductOfferApiService? productOfferApiService})
+    : _productOfferApiService =
+          productOfferApiService ?? ProductOfferApiService();
+
+  FirebaseFirestore? _firestore;
+  final ProductOfferApiService _productOfferApiService;
   final String collectionName = 'rescued_products';
 
   /// Collection reference
-  CollectionReference get _collection => _firestore.collection(collectionName);
+  CollectionReference? get _collection {
+    try {
+      _firestore ??= FirebaseFirestore.instance;
+      return _firestore!.collection(collectionName);
+    } catch (e) {
+      debugPrint('Firestore indisponible: $e');
+      return null;
+    }
+  }
 
   /// Récupère tous les produits "sauvés" disponibles
   Future<List<RescuedProduct>> getAvailableProducts() async {
+    final apiProducts = await _getApiProducts();
+    if (apiProducts.isNotEmpty) return apiProducts;
+
     try {
+      final collection = _collection;
+      if (collection == null) return getMockProducts();
       QuerySnapshot querySnapshot =
-          await _collection
+          await collection
               .where('availableQuantity', isGreaterThan: 0)
               .orderBy('createdAt', descending: true)
               .get();
@@ -25,15 +44,28 @@ class RescuedProductRepository {
       }).toList();
     } catch (e) {
       debugPrint('Erreur lors de la récupération des produits: $e');
-      return [];
+      return getMockProducts();
     }
   }
 
   /// Récupère les produits par catégorie
   Future<List<RescuedProduct>> getProductsByCategory(String category) async {
+    final apiProducts = await _getApiProducts();
+    if (apiProducts.isNotEmpty) {
+      return apiProducts
+          .where((product) => product.category == category)
+          .toList();
+    }
+
     try {
+      final collection = _collection;
+      if (collection == null) {
+        return getMockProducts()
+            .where((product) => product.category == category)
+            .toList();
+      }
       QuerySnapshot querySnapshot =
-          await _collection
+          await collection
               .where('category', isEqualTo: category)
               .orderBy('createdAt', descending: true)
               .get();
@@ -42,8 +74,12 @@ class RescuedProductRepository {
         return RescuedProduct.fromMap(doc.data() as Map<String, dynamic>);
       }).toList();
     } catch (e) {
-      debugPrint('Erreur lors de la récupération des produits par catégorie: $e');
-      return [];
+      debugPrint(
+        'Erreur lors de la récupération des produits par catégorie: $e',
+      );
+      return getMockProducts()
+          .where((product) => product.category == category)
+          .toList();
     }
   }
 
@@ -53,11 +89,24 @@ class RescuedProductRepository {
     double longitude,
     double radiusKm,
   ) async {
+    final apiProducts = await _getApiProducts(
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+    );
+    if (apiProducts.isNotEmpty) return apiProducts;
+
     try {
+      final collection = _collection;
+      if (collection == null) {
+        return getMockProducts()
+            .where((product) => product.distance <= radiusKm)
+            .toList();
+      }
       // Note: Pour une vraie implémentation, utilisez GeoFirestore
       // Cette méthode retourne tous les produits avec tri par distance
       QuerySnapshot querySnapshot =
-          await _collection.orderBy('createdAt', descending: true).get();
+          await collection.orderBy('createdAt', descending: true).get();
 
       List<RescuedProduct> products =
           querySnapshot.docs.map((doc) {
@@ -70,28 +119,43 @@ class RescuedProductRepository {
       }).toList();
     } catch (e) {
       debugPrint('Erreur lors de la récupération des produits proches: $e');
-      return [];
+      return getMockProducts()
+          .where((product) => product.distance <= radiusKm)
+          .toList();
     }
   }
 
   /// Récupère un produit par son ID
   Future<RescuedProduct?> getProductById(String id) async {
+    final apiProducts = await _getApiProducts();
+    for (final product in apiProducts) {
+      if (product.id == id) return product;
+    }
+
     try {
-      DocumentSnapshot doc = await _collection.doc(id).get();
+      final collection = _collection;
+      if (collection == null) {
+        return getMockProducts()
+            .where((product) => product.id == id)
+            .firstOrNull;
+      }
+      DocumentSnapshot doc = await collection.doc(id).get();
       if (doc.exists) {
         return RescuedProduct.fromMap(doc.data() as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
       debugPrint('Erreur lors de la récupération du produit: $e');
-      return null;
+      return getMockProducts().where((product) => product.id == id).firstOrNull;
     }
   }
 
   /// Crée un nouveau produit "sauvé"
   Future<String> createProduct(RescuedProduct product) async {
     try {
-      DocumentReference docRef = await _collection.add(product.toMap());
+      final collection = _collection;
+      if (collection == null) throw Exception('Firestore indisponible');
+      DocumentReference docRef = await collection.add(product.toMap());
       return docRef.id;
     } catch (e) {
       debugPrint('Erreur lors de la création du produit: $e');
@@ -102,8 +166,11 @@ class RescuedProductRepository {
   /// Réserve un produit (décrémente la quantité disponible)
   Future<bool> reserveProduct(String productId) async {
     try {
-      DocumentReference docRef = _collection.doc(productId);
-      return _firestore
+      final collection = _collection;
+      final firestore = _firestore;
+      if (collection == null || firestore == null) return false;
+      DocumentReference docRef = collection.doc(productId);
+      return firestore
           .runTransaction((transaction) async {
             DocumentSnapshot snapshot = await transaction.get(docRef);
             if (!snapshot.exists) {
@@ -128,7 +195,9 @@ class RescuedProductRepository {
   /// Met à jour un produit existant
   Future<void> updateProduct(RescuedProduct product) async {
     try {
-      await _collection.doc(product.id).update(product.toMap());
+      final collection = _collection;
+      if (collection == null) throw Exception('Firestore indisponible');
+      await collection.doc(product.id).update(product.toMap());
     } catch (e) {
       debugPrint('Erreur lors de la mise à jour du produit: $e');
       throw Exception('Échec de la mise à jour du produit');
@@ -138,7 +207,9 @@ class RescuedProductRepository {
   /// Supprime un produit
   Future<void> deleteProduct(String productId) async {
     try {
-      await _collection.doc(productId).delete();
+      final collection = _collection;
+      if (collection == null) throw Exception('Firestore indisponible');
+      await collection.doc(productId).delete();
     } catch (e) {
       debugPrint('Erreur lors de la suppression du produit: $e');
       throw Exception('Échec de la suppression du produit');
@@ -147,11 +218,29 @@ class RescuedProductRepository {
 
   /// Recherche des produits par nom
   Future<List<RescuedProduct>> searchProducts(String query) async {
+    final normalizedQuery = query.trim().toLowerCase();
+    final apiProducts = await _getApiProducts();
+    if (apiProducts.isNotEmpty) {
+      return apiProducts.where((product) {
+        return product.name.toLowerCase().contains(normalizedQuery) ||
+            product.partnerName.toLowerCase().contains(normalizedQuery) ||
+            product.category.toLowerCase().contains(normalizedQuery);
+      }).toList();
+    }
+
     try {
+      final collection = _collection;
+      if (collection == null) {
+        return getMockProducts().where((product) {
+          return product.name.toLowerCase().contains(normalizedQuery) ||
+              product.partnerName.toLowerCase().contains(normalizedQuery) ||
+              product.category.toLowerCase().contains(normalizedQuery);
+        }).toList();
+      }
       QuerySnapshot querySnapshot =
-          await _collection
+          await collection
               .where('name', isGreaterThanOrEqualTo: query)
-              .where('name', isLessThanOrEqualTo: '${query}\uf8ff')
+              .where('name', isLessThanOrEqualTo: '$query\uf8ff')
               .get();
 
       return querySnapshot.docs.map((doc) {
@@ -159,6 +248,31 @@ class RescuedProductRepository {
       }).toList();
     } catch (e) {
       debugPrint('Erreur lors de la recherche des produits: $e');
+      return getMockProducts().where((product) {
+        return product.name.toLowerCase().contains(normalizedQuery) ||
+            product.partnerName.toLowerCase().contains(normalizedQuery) ||
+            product.category.toLowerCase().contains(normalizedQuery);
+      }).toList();
+    }
+  }
+
+  Future<List<RescuedProduct>> _getApiProducts({
+    double? latitude,
+    double? longitude,
+    double radiusKm = 25,
+  }) async {
+    try {
+      final offers = await _productOfferApiService.getProductOffers(
+        latitude: latitude,
+        longitude: longitude,
+        radiusKm: radiusKm,
+      );
+      return offers
+          .where((offer) => offer.availableQuantity > 0)
+          .map(RescuedProduct.fromOffer)
+          .toList();
+    } catch (e) {
+      debugPrint('API produits indisponible: $e');
       return [];
     }
   }
@@ -168,7 +282,7 @@ class RescuedProductRepository {
     final now = DateTime.now();
     return [
       RescuedProduct(
-        id: '1',
+        id: 'offer_crevettes_port',
         name: 'Sacs de crevettes grises',
         description:
             'Sacs de 500g de crevettes grises fraiches, à récupérer aujourd\'hui avant 18h. Provenance: Côtes sénégalaises.',
@@ -187,7 +301,7 @@ class RescuedProductRepository {
         distance: 0.8,
       ),
       RescuedProduct(
-        id: '2',
+        id: 'offer_huitres_belon',
         name: 'Plateau d\'huîtres n°3',
         description:
             'Douze huîtres n°3 du Bélon, servies dans leur coquille. À récupérer impérativement aujourd\'hui.',
@@ -206,7 +320,7 @@ class RescuedProductRepository {
         distance: 1.2,
       ),
       RescuedProduct(
-        id: '3',
+        id: 'offer_maquereau_filets',
         name: 'Filets de maquereau frais',
         description:
             'Trois filets de maquereau de 200g chacun, péchés ce matin. À consommer rapidement.',
@@ -225,7 +339,7 @@ class RescuedProductRepository {
         distance: 2.0,
       ),
       RescuedProduct(
-        id: '4',
+        id: 'offer_sashimi_thon',
         name: 'Sashimi thon rouge',
         description:
             '200g de thon rouge pour sashimi, qualité restaurant. À récupérer aujourd\'hui.',

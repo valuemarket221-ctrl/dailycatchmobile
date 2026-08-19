@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Page pour changer le mot de passe
 class ChangePasswordPage extends StatefulWidget {
@@ -20,12 +21,22 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
+  @override
+  void dispose() {
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
   void _changePassword() {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
       // Simulation de changement de mot de passe
       Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+
         setState(() => _isLoading = false);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -34,7 +45,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               'Mot de passe changé avec succès!',
               style: GoogleFonts.poppins(),
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.greenTGTG,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -47,140 +58,147 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
-        title: Text('Changer le mot de passe', style: GoogleFonts.poppins()),
-        backgroundColor: AppColors.blueBic,
-        foregroundColor: Colors.white,
+        title: Text(
+          'Sécurité',
+          style: GoogleFonts.poppins(
+            color: AppColors.blueBic,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.blueBic,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icône de sécurité
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.blueBic.withOpacity(0.1),
-                    shape: BoxShape.circle,
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.softBorder),
+              boxShadow: AppTheme.shadowSm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.blueBic.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline,
+                      size: 54,
+                      color: AppColors.blueBic,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.lock_outline,
-                    size: 60,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Nouveau mot de passe',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.blueBic,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              Text(
-                'Nouveau mot de passe',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Votre nouveau mot de passe doit contenir au moins 8 caractères',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Ancien mot de passe
-              _buildPasswordField(
-                controller: _oldPasswordController,
-                label: 'Ancien mot de passe',
-                obscure: _obscureOldPassword,
-                onToggle: () {
-                  setState(() => _obscureOldPassword = !_obscureOldPassword);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer votre ancien mot de passe';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Nouveau mot de passe
-              _buildPasswordField(
-                controller: _newPasswordController,
-                label: 'Nouveau mot de passe',
-                obscure: _obscureNewPassword,
-                onToggle: () {
-                  setState(() => _obscureNewPassword = !_obscureNewPassword);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un nouveau mot de passe';
-                  }
-                  if (value.length < 8) {
-                    return 'Le mot de passe doit contenir au moins 8 caractères';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Confirmer le mot de passe
-              _buildPasswordField(
-                controller: _confirmPasswordController,
-                label: 'Confirmer le mot de passe',
-                obscure: _obscureConfirmPassword,
-                onToggle: () {
-                  setState(
-                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                  );
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez confirmer votre mot de passe';
-                  }
-                  if (value != _newPasswordController.text) {
-                    return 'Les mots de passe ne correspondent pas';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 32),
-
-              // Bouton valider
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _changePassword,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.blueBic,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Utilisez au moins 8 caractères. Ne partagez jamais votre mot de passe.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[600],
                   ),
-                  child:
-                      _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                            'Changer le mot de passe',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                _buildPasswordField(
+                  controller: _oldPasswordController,
+                  label: 'Ancien mot de passe',
+                  obscure: _obscureOldPassword,
+                  onToggle: () {
+                    setState(() => _obscureOldPassword = !_obscureOldPassword);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer votre ancien mot de passe';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildPasswordField(
+                  controller: _newPasswordController,
+                  label: 'Nouveau mot de passe',
+                  obscure: _obscureNewPassword,
+                  onToggle: () {
+                    setState(() => _obscureNewPassword = !_obscureNewPassword);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer un nouveau mot de passe';
+                    }
+                    if (value.length < 8) {
+                      return 'Le mot de passe doit contenir au moins 8 caractères';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildPasswordField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirmer le mot de passe',
+                  obscure: _obscureConfirmPassword,
+                  onToggle: () {
+                    setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                    );
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez confirmer votre mot de passe';
+                    }
+                    if (value != _newPasswordController.text) {
+                      return 'Les mots de passe ne correspondent pas';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _changePassword,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.blueBic,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child:
+                        _isLoading
+                            ? const CircularProgressIndicator(
+                              color: Colors.white,
+                            )
+                            : Text(
+                              'Changer le mot de passe',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,24 +1,70 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:myapp/config/router/app_router.dart'; // Import the new router
-import 'package:myapp/constants.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:myapp/config/router/app_router.dart';
+import 'package:myapp/providers/cart_provider.dart';
+import 'package:myapp/providers/locale_provider.dart';
+import 'package:myapp/providers/partner_provider.dart';
+import 'package:myapp/services/push_token_registration_service.dart';
+import 'package:myapp/styles/app_theme.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/environment.dart';
+import 'package:provider/provider.dart';
 
 // Options de configuration Firebase pour votre projet.
-const firebaseOptions = FirebaseOptions(
-  apiKey: "AIzaSyCr9RvlsDfDchsTbafxH7EsELC1G_hY31c",
-  authDomain: "dailycatchapp-2250781-da029.firebaseapp.com",
-  projectId: "dailycatchapp-2250781-da029",
-  storageBucket: "dailycatchapp-2250781-da029.appspot.com",
-  messagingSenderId: "476454942774",
-  appId: "1:476454942774:web:7e1b8a35ca1b8794024097",
+final firebaseOptions = FirebaseOptions(
+  apiKey: Environment.firebaseApiKey,
+  authDomain: Environment.firebaseAuthDomain,
+  projectId: Environment.firebaseProjectId,
+  storageBucket: Environment.firebaseStorageBucket,
+  messagingSenderId: Environment.firebaseMessagingSenderId,
+  appId: Environment.firebaseAppId,
 );
 
 void main() async {
   // Assure que les liaisons Flutter sont prêtes avant d'exécuter du code natif.
   WidgetsFlutterBinding.ensureInitialized();
+  ApiEnvironment.validateRuntimeConfiguration();
+  PaintingBinding.instance.imageCache.maximumSize = 120;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 120 << 20;
+  usePathUrlStrategy();
+  // Initialise EasyLocalization
+  await EasyLocalization.ensureInitialized();
+  // Initialise les données de date pour intl
+  await initializeDateFormatting('fr_FR', null);
+  await initializeDateFormatting('en_US', null);
+  await initializeDateFormatting('de_DE', null);
   // Initialise Firebase avec les options de configuration.
+  if (!Environment.isFirebaseConfigured) {
+    throw StateError(
+      'Firebase configuration is missing. Provide FIREBASE_* values with --dart-define.',
+    );
+  }
   await Firebase.initializeApp(options: firebaseOptions);
-  runApp(const MyApp());
+  PushTokenRegistrationService().registerDeviceToken().ignore();
+  if (!kIsWeb && ApiEnvironment.stripePublishableKey.isNotEmpty) {
+    Stripe.publishableKey = ApiEnvironment.stripePublishableKey;
+    await Stripe.instance.applySettings();
+  }
+  runApp(
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+        Locale('de', 'DE'),
+        Locale('es', 'ES'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('fr', 'FR'),
+      startLocale: const Locale('fr', 'FR'),
+      useOnlyLangCode: true,
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -26,30 +72,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      routerConfig: router, // Use the go_router configuration
-      title: 'dailycatch.app',
-      theme: ThemeData(
-        primaryColor: AppColors.blueBic,
-        colorScheme: ColorScheme(
-          primary: AppColors.blueBic,
-          secondary: AppColors.yellowColor,
-          surface: Colors.white,
-          error: const Color.fromARGB(255, 253, 27, 11),
-          onPrimary: Colors.white,
-          onSecondary: Colors.black,
-          onSurface: Colors.black,
-          onError: Colors.white,
-          brightness: Brightness.light,
-        ),
-        appBarTheme: AppBarTheme(
-          color: AppColors.blueBic,
-        ),
-        buttonTheme: ButtonThemeData(
-          buttonColor: AppColors.yellowColor,
-        ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(create: (_) => PartnerProvider()),
+      ],
+      child: MaterialApp.router(
+        routerConfig: router,
+        title: 'DailyCatch',
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+        theme: AppTheme.theme,
+        debugShowCheckedModeBanner: false,
       ),
-      debugShowCheckedModeBanner: false,
     );
   }
 }

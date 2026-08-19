@@ -32,11 +32,11 @@ class _PickupConfirmationPageState extends State<PickupConfirmationPage> {
           onPressed: () => context.go('/my-reservations'),
         ),
         title: Text(
-          'Retrait de commande',
+          'Retrait du panier',
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: AppColors.blueBic,
           ),
         ),
       ),
@@ -246,7 +246,7 @@ class _PickupConfirmationPageState extends State<PickupConfirmationPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Comment récupérer votre commande ?',
+                      'Comment récupérer votre panier ?',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -254,9 +254,9 @@ class _PickupConfirmationPageState extends State<PickupConfirmationPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildInstruction(1, 'Présentez ce code QR au commerçant'),
-                    _buildInstruction(2, 'Le commerçant scannera votre code'),
-                    _buildInstruction(3, 'Récupérez vos produits'),
+                    _buildInstruction(1, 'Présentez ce code QR au commerce'),
+                    _buildInstruction(2, 'Le commerce valide votre retrait'),
+                    _buildInstruction(3, 'Récupérez votre panier surprise'),
                   ],
                 ),
               ),

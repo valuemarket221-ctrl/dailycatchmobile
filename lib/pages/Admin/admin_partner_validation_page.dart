@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/admin_api_service.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Partner Validation Page - Clone TGTG Style
 /// Page pour valider/refuser les demandes de partenariat en attente
@@ -13,112 +15,162 @@ class PartnerValidationPage extends StatefulWidget {
 }
 
 class _PartnerValidationPageState extends State<PartnerValidationPage> {
-  // Mock data for pending partners
-  final List<Map<String, dynamic>> _pendingPartners = [
-    {
-      'id': 'P003',
-      'name': 'Ocean Fresh',
-      'owner': 'Fatou Sall',
-      'category': 'Poisson',
-      'email': 'hello@oceanfresh.sn',
-      'phone': '+221 77 345 67 89',
-      'address': '42 Quai des Pêcheurs',
-      'appliedDate': DateTime.now().subtract(const Duration(days: 3)),
-      'description': 'Spécialiste du poisson frais avec 10 ans d\'expérience.',
-      'openingHours': '08:00 - 20:00',
-    },
-    {
-      'id': 'P006',
-      'name': 'Les Fruits de Mer',
-      'owner': 'Ousmane Touré',
-      'category': 'Fruits de mer',
-      'email': 'contact@fruitsdemer.sn',
-      'phone': '+221 77 678 90 12',
-      'address': '25 Boulevard de la Corniche',
-      'appliedDate': DateTime.now().subtract(const Duration(days: 1)),
-      'description': 'Commerce familial spécialisé dans les crustacés.',
-      'openingHours': '07:00 - 19:00',
-    },
-    {
-      'id': 'P007',
-      'name': 'Le Petit Pêcheur',
-      'owner': 'Marie Diop',
-      'category': 'Poissonnerie',
-      'email': 'info@petitpecheur.sn',
-      'phone': '+221 77 789 01 23',
-      'address': '8 Rue de la Plage',
-      'appliedDate': DateTime.now().subtract(const Duration(hours: 6)),
-      'description': 'Poisson frais directement de la peche du jour.',
-      'openingHours': '06:00 - 14:00',
-    },
-  ];
+  final AdminApiService _adminApiService = AdminApiService();
+  bool _isLoading = true;
+  String? _loadError;
+  List<Map<String, dynamic>> _pendingPartners = const [];
 
-  void _approvePartner(String partnerId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Partenaire $partnerId approuvé avec succès!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-    setState(() {});
+  @override
+  void initState() {
+    super.initState();
+    _loadApplications();
+  }
+
+  Future<void> _loadApplications() async {
+    try {
+      final applications = await _adminApiService.getPartnerApplications();
+      if (!mounted) return;
+      setState(() {
+        _pendingPartners = applications;
+        _loadError = null;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pendingPartners = const [];
+        _loadError = 'Demandes partenaires indisponibles.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _approvePartner(String userId) async {
+    try {
+      await _adminApiService.updatePartnerApplication(
+        userId: userId,
+        status: 'approved',
+      );
+      if (!mounted) return;
+      _showMessage('Partenaire approuvé. Le rôle vendeur est actif.');
+      await _loadApplications();
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Approbation impossible.', isError: true);
+    }
   }
 
   void _rejectPartner(String partnerId) {
+    final reasonController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Rejeter le partenaire', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: TextField(
-          decoration: const InputDecoration(
-            labelText: 'Motif du rejet',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Annuler', style: GoogleFonts.poppins()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Partenaire $partnerId rejeté'),
-                  backgroundColor: Colors.red,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Rejeter le commerce',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+            content: TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Motif du rejet',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Annuler', style: GoogleFonts.poppins()),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.errorColor,
                 ),
-              );
-              setState(() {});
-            },
-            child: Text('Confirmer le rejet', style: GoogleFonts.poppins()),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  try {
+                    await _adminApiService.updatePartnerApplication(
+                      userId: partnerId,
+                      status: 'rejected',
+                      rejectionReason: reasonController.text.trim(),
+                    );
+                    if (!mounted) return;
+                    _showMessage('Demande partenaire rejetée.');
+                    await _loadApplications();
+                  } catch (_) {
+                    if (!mounted) return;
+                    _showMessage('Rejet impossible.', isError: true);
+                  } finally {
+                    reasonController.dispose();
+                  }
+                },
+                child: Text('Confirmer le rejet', style: GoogleFonts.poppins()),
+              ),
+            ],
           ),
-        ],
+    ).then((_) {
+      if (reasonController.text.isEmpty) {
+        reasonController.dispose();
+      }
+    });
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppTheme.errorColor : AppColors.greenTGTG,
       ),
     );
+  }
+
+  Map<String, dynamic> _normalizeApplication(Map<String, dynamic> partner) {
+    final createdAt = DateTime.tryParse(partner['createdAt'] as String? ?? '');
+    return {
+      'id': partner['userId'] as String? ?? partner['id'] as String? ?? '',
+      'name': partner['storeName'] as String? ?? 'Commerce',
+      'owner': partner['ownerName'] as String? ?? 'Responsable',
+      'category': partner['category'] as String? ?? 'Non renseigné',
+      'email': partner['email'] as String? ?? '',
+      'phone':
+          partner['storePhone'] as String? ??
+          partner['ownerPhone'] as String? ??
+          '',
+      'address': [
+        partner['address'] as String? ?? '',
+        partner['city'] as String? ?? '',
+      ].where((item) => item.isNotEmpty).join(', '),
+      'appliedDate': createdAt ?? DateTime.now(),
+      'description': partner['description'] as String? ?? '',
+      'openingHours': 'A configurer',
+      'siret': partner['siret'] as String? ?? '',
+      'vat': partner['vat'] as String? ?? '',
+      'website': partner['website'] as String? ?? '',
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.mutedSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
         title: Text(
           'Validation partenaires',
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: AppColors.blueBic,
           ),
         ),
         leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+          builder:
+              (context) => IconButton(
+                icon: const Icon(Icons.menu, color: AppColors.blueBic),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
         ),
         actions: [
           Center(
@@ -126,15 +178,15 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
               margin: const EdgeInsets.only(right: 16),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.orange,
-                borderRadius: BorderRadius.circular(20),
+                color: AppTheme.warningColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '${_pendingPartners.length} en attente',
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppTheme.warningColor,
                 ),
               ),
             ),
@@ -142,16 +194,75 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
         ],
       ),
       drawer: _buildDrawer(context),
-      body: _pendingPartners.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _pendingPartners.length,
-              itemBuilder: (context, index) {
-                final partner = _pendingPartners[index];
-                return _buildPartnerCard(context, partner);
-              },
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+              ? _buildLoadError()
+              : _pendingPartners.isEmpty
+              ? _buildEmptyState()
+              : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildSummaryHeader(),
+                  const SizedBox(height: 14),
+                  ..._pendingPartners
+                      .map(_normalizeApplication)
+                      .map((partner) => _buildPartnerCard(context, partner)),
+                ],
+              ),
+    );
+  }
+
+  Widget _buildSummaryHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppTheme.warningColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: const Icon(
+              Icons.verified_user,
+              color: AppTheme.warningColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Commerces à vérifier',
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.blueBic,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Contrôlez identité, adresse, horaires et catégorie avant activation.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -164,10 +275,14 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
+              color: AppColors.greenTGTG.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle, size: 48, color: Colors.green),
+            child: const Icon(
+              Icons.check_circle,
+              size: 48,
+              color: AppColors.greenTGTG,
+            ),
           ),
           const SizedBox(height: 24),
           Text(
@@ -180,12 +295,40 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
           const SizedBox(height: 8),
           Text(
             'Toutes les demandes ont été traitées',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.softBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, color: AppTheme.errorColor, size: 42),
+            const SizedBox(height: 12),
+            Text(
+              _loadError!,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadApplications,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -197,15 +340,9 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppTheme.shadowSm,
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
+          color: AppTheme.warningColor.withValues(alpha: 0.35),
         ),
       ),
       child: Column(
@@ -242,6 +379,7 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: AppColors.blueBic,
                       ),
                     ),
                     Text(
@@ -254,13 +392,17 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.access_time, size: 14, color: Colors.orange),
+                        const Icon(
+                          Icons.access_time,
+                          size: 14,
+                          color: AppTheme.warningColor,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Il y a ${_getTimeAgo(partner['appliedDate'] as DateTime)}',
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Colors.orange,
+                            color: AppTheme.warningColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -275,25 +417,41 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
           const Divider(),
           const SizedBox(height: 12),
           // Info
-          _buildInfoRow(Icons.person, 'Responsable:', partner['owner'] as String),
+          _buildInfoRow(
+            Icons.person,
+            'Responsable:',
+            partner['owner'] as String,
+          ),
           _buildInfoRow(Icons.email, 'Email:', partner['email'] as String),
           _buildInfoRow(Icons.phone, 'Téléphone:', partner['phone'] as String),
-          _buildInfoRow(Icons.location_on, 'Adresse:', partner['address'] as String),
-          _buildInfoRow(Icons.access_time, 'Horaires:', partner['openingHours'] as String),
+          _buildInfoRow(
+            Icons.location_on,
+            'Adresse:',
+            partner['address'] as String,
+          ),
+          _buildInfoRow(
+            Icons.access_time,
+            'Horaires:',
+            partner['openingHours'] as String,
+          ),
+          _buildInfoRow(Icons.badge, 'SIRET:', partner['siret'] as String),
+          if ((partner['website'] as String).isNotEmpty)
+            _buildInfoRow(
+              Icons.language,
+              'Site:',
+              partner['website'] as String,
+            ),
           const SizedBox(height: 12),
           // Description
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: AppTheme.mutedSurface,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               partner['description'] as String,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey[700],
-              ),
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
             ),
           ),
           const SizedBox(height: 16),
@@ -305,14 +463,17 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
                   onPressed: () => _rejectPartner(partner['id'] as String),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: Colors.red),
-                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: AppTheme.errorColor),
+                    foregroundColor: AppTheme.errorColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   icon: const Icon(Icons.close),
-                  label: Text('Rejeter', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  label: Text(
+                    'Rejeter',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -321,13 +482,16 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
                   onPressed: () => _approvePartner(partner['id'] as String),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.greenTGTG,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   icon: const Icon(Icons.check),
-                  label: Text('Approuver', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  label: Text(
+                    'Approuver',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -348,10 +512,7 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
             width: 100,
             child: Text(
               label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey[600],
-              ),
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
             ),
           ),
           Expanded(
@@ -386,7 +547,10 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
         children: [
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: AppColors.blueBic),
-            accountName: Text('Administrateur', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            accountName: Text(
+              'Administrateur',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
             accountEmail: Text('admin@dailycatch.com'),
             currentAccountPicture: const CircleAvatar(
               backgroundColor: Colors.white,

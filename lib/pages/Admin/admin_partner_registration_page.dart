@@ -9,7 +9,8 @@ class PartnerRegistrationPage extends StatefulWidget {
   const PartnerRegistrationPage({super.key});
 
   @override
-  State<PartnerRegistrationPage> createState() => _PartnerRegistrationPageState();
+  State<PartnerRegistrationPage> createState() =>
+      _PartnerRegistrationPageState();
 }
 
 class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
@@ -76,10 +77,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
         ),
         title: Text(
           'Devenir partenaire',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
@@ -233,10 +231,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
           const SizedBox(height: 8),
           Text(
             'Commencez par nous parler de votre commerce',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 32),
           // Store name
@@ -273,7 +268,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Vous pourrez ajouter vos produits après validation de votre demande.',
+                    'Vous pourrez publier vos paniers après validation de votre demande.',
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       color: Colors.grey[700],
@@ -305,10 +300,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
           const SizedBox(height: 8),
           Text(
             'Ces informations nous aideront à vous contacter',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 32),
           // Owner name
@@ -394,10 +386,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
           const SizedBox(height: 8),
           Text(
             'Définissez votre mot de passe pour accéder à votre espace',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 32),
           // Password
@@ -422,7 +411,9 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
             obscureText: true,
             validator: (value) {
               if (value!.isEmpty) return 'Confirmation requise';
-              if (value != _passwordController.text) return 'Les mots de passe ne correspondent pas';
+              if (value != _passwordController.text) {
+                return 'Les mots de passe ne correspondent pas';
+              }
               return null;
             },
           ),
@@ -438,21 +429,30 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
                   height: 24,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: _agreedToTerms ? AppColors.blueBic : Colors.transparent,
+                    color:
+                        _agreedToTerms ? AppColors.blueBic : Colors.transparent,
                     border: Border.all(
                       color: _agreedToTerms ? AppColors.blueBic : Colors.grey,
                     ),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: _agreedToTerms
-                      ? const Icon(Icons.check, size: 16, color: Colors.white)
-                      : null,
+                  child:
+                      _agreedToTerms
+                          ? const Icon(
+                            Icons.check,
+                            size: 16,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
                 Expanded(
                   child: Text.rich(
                     TextSpan(
                       text: 'J\'accepte les ',
-                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
                       children: [
                         TextSpan(
                           text: 'Conditions Générales',
@@ -464,7 +464,10 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
                         ),
                         TextSpan(
                           text: ' et la ',
-                          style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
                         ),
                         TextSpan(
                           text: 'Politique de confidentialité',
@@ -476,7 +479,10 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
                         ),
                         TextSpan(
                           text: ' pour devenir partenaire DailyCatch.',
-                          style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
@@ -530,10 +536,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -562,14 +565,11 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
       children: [
         Text(
           'Catégorie',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedCategory,
+          initialValue: _selectedCategory,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.category, color: AppColors.blueBic),
             filled: true,
@@ -579,12 +579,13 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
               borderSide: BorderSide.none,
             ),
           ),
-          items: _categories.map((category) {
-            return DropdownMenuItem(
-              value: category,
-              child: Text(category, style: GoogleFonts.poppins()),
-            );
-          }).toList(),
+          items:
+              _categories.map((category) {
+                return DropdownMenuItem(
+                  value: category,
+                  child: Text(category, style: GoogleFonts.poppins()),
+                );
+              }).toList(),
           onChanged: (value) => setState(() => _selectedCategory = value!),
         ),
       ],
@@ -605,10 +606,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              defaultValue,
-              style: GoogleFonts.poppins(fontSize: 14),
-            ),
+            child: Text(defaultValue, style: GoogleFonts.poppins(fontSize: 14)),
           ),
         ),
       ],
@@ -622,12 +620,18 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
         children: [
           SizedBox(
             width: 100,
-            child: Text(label, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600])),
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
+            ),
           ),
           Expanded(
             child: Text(
               value.isEmpty ? '-' : value,
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/styles/app_theme.dart';
 
 /// Page Profil utilisateur complète
 class ProfilPage extends StatefulWidget {
@@ -15,16 +16,18 @@ class ProfilPage extends StatefulWidget {
 
 class _ProfilPageState extends State<ProfilPage> {
   // Données utilisateur fictives
-  String _userName = 'Ibrahima Aidara Sadio';
-  String _userEmail = 'ibrahima.aidara@gmail.com';
+  final String _userName = 'Ibrahima Aidara Sadio';
+  final String _userEmail = 'ibrahima.aidara@gmail.com';
   String _userAvatar = '';
   final ImagePicker _picker = ImagePicker();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.mutedSurface,
       appBar: _buildAppBar(context),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 12),
         child: Column(
           children: [
             // Header avec photo de profil
@@ -50,6 +53,13 @@ class _ProfilPageState extends State<ProfilPage> {
   Widget _buildProfileHeader() {
     return Container(
       padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
+      ),
       child: Column(
         children: [
           // Photo de profil avec edit
@@ -80,7 +90,7 @@ class _ProfilPageState extends State<ProfilPage> {
                 right: 0,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: AppColors.yellowColor,
+                    color: AppColors.greenTGTG,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -88,7 +98,7 @@ class _ProfilPageState extends State<ProfilPage> {
                     icon: const Icon(
                       Icons.camera_alt,
                       size: 20,
-                      color: Colors.black,
+                      color: Colors.white,
                     ),
                     onPressed: _changeAvatar,
                   ),
@@ -116,20 +126,24 @@ class _ProfilPageState extends State<ProfilPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              color: AppColors.greenTGTG.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.verified, color: Colors.green, size: 16),
+                const Icon(
+                  Icons.verified,
+                  color: AppColors.greenTGTG,
+                  size: 16,
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  'Membre Gold',
+                  'Sauveur DailyCatch',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.green,
+                    color: AppColors.greenTGTG,
                   ),
                 ),
               ],
@@ -142,20 +156,14 @@ class _ProfilPageState extends State<ProfilPage> {
 
   Widget _buildStatsCard() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blueBic, AppColors.blueBic.withOpacity(0.8)],
+          colors: [AppColors.blueBic, AppColors.blueBic.withValues(alpha: 0.8)],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.blueBic.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.shadowSm,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -197,7 +205,7 @@ class _ProfilPageState extends State<ProfilPage> {
           label,
           style: GoogleFonts.poppins(
             fontSize: 12,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -208,8 +216,8 @@ class _ProfilPageState extends State<ProfilPage> {
     final menuItems = [
       {
         'icon': Icons.qr_code_2,
-        'title': 'Mes réservations',
-        'subtitle': 'Voir mes produits sauvés',
+        'title': 'Mes sauvés',
+        'subtitle': 'Paniers réservés et QR code',
         'color': AppColors.blueBic,
         'route': '/my-reservations',
       },
@@ -223,20 +231,20 @@ class _ProfilPageState extends State<ProfilPage> {
       {
         'icon': Icons.location_on,
         'title': 'Mes adresses',
-        'subtitle': 'Gérer mes adresses',
+        'subtitle': 'Retrait autour de ma position',
         'color': Colors.orange,
         'route': '/addresses',
       },
       {
         'icon': Icons.notifications,
         'title': 'Notifications',
-        'subtitle': 'Préférences de notification',
+        'subtitle': 'Alertes paniers disponibles',
         'color': Colors.red,
         'route': '/notifications-settings',
       },
       {
         'icon': Icons.payment,
-        'title': 'Moyens de paiement',
+        'title': 'Paiement',
         'subtitle': 'Cartes, mobile money',
         'color': Colors.green,
         'route': '/payment-methods',
@@ -244,7 +252,7 @@ class _ProfilPageState extends State<ProfilPage> {
       {
         'icon': Icons.history,
         'title': 'Historique',
-        'subtitle': 'Mes anciennes commandes',
+        'subtitle': 'Paniers récupérés',
         'color': Colors.blueGrey,
         'route': '/orders-history',
       },
@@ -258,20 +266,20 @@ class _ProfilPageState extends State<ProfilPage> {
       {
         'icon': Icons.favorite,
         'title': 'Mes favoris',
-        'subtitle': 'Produits favoris',
+        'subtitle': 'Commerces et paniers suivis',
         'color': Colors.pink,
         'route': '/favorites',
       },
       {
         'icon': Icons.chat,
         'title': 'Messages',
-        'subtitle': 'Voir mes conversations',
+        'subtitle': 'Support et commerces',
         'color': Colors.amber,
         'route': '/messages',
       },
       {
         'icon': Icons.store,
-        'title': 'Devenir partenaire',
+        'title': 'Devenir vendeur',
         'subtitle': 'Rejoindre le réseau DailyCatch',
         'color': Colors.indigo,
         'route': '/partenaire',
@@ -279,18 +287,13 @@ class _ProfilPageState extends State<ProfilPage> {
     ];
 
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
       ),
       child: Column(
         children:
@@ -329,7 +332,7 @@ class _ProfilPageState extends State<ProfilPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -342,8 +345,9 @@ class _ProfilPageState extends State<ProfilPage> {
                   Text(
                     title,
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
+                      color: AppColors.blueBic,
                     ),
                   ),
                   Text(
@@ -392,18 +396,13 @@ class _ProfilPageState extends State<ProfilPage> {
     ];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.softBorder),
+        boxShadow: AppTheme.shadowSm,
       ),
       child: Column(
         children:
@@ -440,7 +439,7 @@ class _ProfilPageState extends State<ProfilPage> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 20),
@@ -479,7 +478,7 @@ class _ProfilPageState extends State<ProfilPage> {
             ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.withOpacity(0.1),
+            backgroundColor: Colors.red.withValues(alpha: 0.08),
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -494,7 +493,7 @@ class _ProfilPageState extends State<ProfilPage> {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-      centerTitle: true,
+      centerTitle: false,
       leading: IconButton(
         icon: const Icon(Icons.home, color: AppColors.blueBic),
         onPressed: () => context.go('/home'),
@@ -512,7 +511,7 @@ class _ProfilPageState extends State<ProfilPage> {
         Container(
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: AppColors.blueBic.withOpacity(0.1),
+            color: AppColors.blueBic.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: IconButton(
@@ -523,9 +522,6 @@ class _ProfilPageState extends State<ProfilPage> {
           ),
         ),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-      ),
     );
   }
 
@@ -591,6 +587,8 @@ class _ProfilPageState extends State<ProfilPage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -614,7 +612,7 @@ class _ProfilPageState extends State<ProfilPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.blueBic.withOpacity(0.1),
+              color: AppColors.blueBic.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 40, color: AppColors.blueBic),
@@ -657,16 +655,18 @@ class _ProfilPageState extends State<ProfilPage> {
               ),
               ElevatedButton(
                 onPressed: () async {
+                  final router = GoRouter.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
                   try {
                     // Déconnexion Firebase
                     await FirebaseAuth.instance.signOut();
                     // Navigation vers la page de login
-                    if (mounted) {
-                      context.go('/login');
-                    }
+                    router.go('/login');
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    if (!mounted) return;
+
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           'Erreur: ${e.toString()}',
