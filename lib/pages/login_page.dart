@@ -103,111 +103,98 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final maxWidth = media.size.shortestSide >= 600 ? 430.0 : double.infinity;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFEFF4F3),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            margin: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: const Color(0xFFB7C0C1), width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  _heroImage,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.bottomCenter,
-                  cacheWidth:
-                      (media.size.width * media.devicePixelRatio).round(),
-                  filterQuality: FilterQuality.medium,
-                ),
-                const _TopWash(),
-                const _BottomWash(),
-                SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    media.padding.top + 34,
-                    24,
-                    media.padding.bottom + 18,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          media.size.height - media.padding.vertical - 56,
-                    ),
-                    child: Column(
-                      children: [
-                        const DailyCatchWordmark(),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Connexion',
-                          style: GoogleFonts.poppins(
-                            color: AppColors.blueBic,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
-                          ),
+      backgroundColor: Colors.white,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            _heroImage,
+            fit: BoxFit.cover,
+            alignment: Alignment.bottomCenter,
+            excludeFromSemantics: true,
+          ),
+          const ColoredBox(color: Color(0xEFFFFFFF)),
+          SafeArea(
+            child: LayoutBuilder(
+              builder:
+                  (context, constraints) => SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 32,
                         ),
-                        Text(
-                          'Retrouvez vos paniers frais.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: AppColors.blueBic.withValues(alpha: 0.76),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 34),
-                        _LoginPanel(
-                          formKey: _formKey,
-                          emailController: _emailController,
-                          passwordController: _passwordController,
-                          obscureText: _obscureText,
-                          isLoading: _isLoading,
-                          onTogglePassword:
-                              () =>
-                                  setState(() => _obscureText = !_obscureText),
-                          onSubmit: _validateAndSubmit,
-                        ),
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () => context.go('/role-selection'),
-                          child: Text(
-                            'Créer un compte',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const DailyCatchWordmark(),
+                                const SizedBox(height: 32),
+                                Text(
+                                  'Connexion',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.blueBic,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Retrouvez vos paniers frais.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.blueBic.withValues(
+                                      alpha: 0.76,
+                                    ),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+                                _LoginPanel(
+                                  formKey: _formKey,
+                                  emailController: _emailController,
+                                  passwordController: _passwordController,
+                                  obscureText: _obscureText,
+                                  isLoading: _isLoading,
+                                  onTogglePassword:
+                                      () => setState(
+                                        () => _obscureText = !_obscureText,
+                                      ),
+                                  onSubmit: _validateAndSubmit,
+                                ),
+                                const SizedBox(height: 20),
+                                TextButton(
+                                  onPressed:
+                                      _isLoading
+                                          ? null
+                                          : () => context.go('/role-selection'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.blueBic,
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  child: const Text('Créer un compte'),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -234,20 +221,7 @@ class _LoginPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return AutofillGroup(
       child: Form(
         key: formKey,
         child: Column(
@@ -271,6 +245,10 @@ class _LoginPanel extends StatelessWidget {
               icon: Icons.lock_outline,
               obscureText: obscureText,
               suffix: IconButton(
+                tooltip:
+                    obscureText
+                        ? 'Afficher le mot de passe'
+                        : 'Masquer le mot de passe',
                 onPressed: onTogglePassword,
                 icon: Icon(
                   obscureText
@@ -390,54 +368,6 @@ class _AuthField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.blueBic, width: 1.4),
-        ),
-      ),
-    );
-  }
-}
-
-class _TopWash extends StatelessWidget {
-  const _TopWash();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.center,
-            colors: [
-              Colors.white.withValues(alpha: 0.95),
-              Colors.white.withValues(alpha: 0.70),
-              Colors.white.withValues(alpha: 0.06),
-            ],
-            stops: const [0, 0.42, 1],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomWash extends StatelessWidget {
-  const _BottomWash();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.center,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              AppColors.blueBic.withValues(alpha: 0.16),
-              AppColors.blueBic.withValues(alpha: 0.78),
-            ],
-            stops: const [0, 0.68, 1],
-          ),
         ),
       ),
     );
