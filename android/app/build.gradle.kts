@@ -2,10 +2,18 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") apply false
 }
 
 import java.util.Properties
 import java.io.FileInputStream
+import java.util.Base64
+
+val isDemoBuild = (project.findProperty("dart-defines") as? String)
+    ?.split(",")?.any {
+        String(Base64.getDecoder().decode(it)) == "DEMO_MODE=true"
+    } ?: false
+if (!isDemoBuild) apply(plugin = "com.google.gms.google-services")
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -20,11 +28,13 @@ val hasReleaseKeystore =
     keystoreProperties["storePassword"] != null
 
 android {
-    namespace = "com.example.myapp"
+    namespace = "com.dailycatch.app"
     compileSdk = flutter.compileSdkVersion
 
     defaultConfig {
-        applicationId = "com.example.myapp"
+        applicationId = "com.dailycatch.app"
+        if (isDemoBuild) applicationIdSuffix = ".demo"
+        manifestPlaceholders["appLabel"] = if (isDemoBuild) "DailyCatch Demo" else "DailyCatch"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = 1
@@ -47,8 +57,12 @@ android {
             if (hasReleaseKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 

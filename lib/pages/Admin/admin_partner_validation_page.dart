@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/admin_api_service.dart';
@@ -570,7 +571,7 @@ class _PartnerValidationPageState extends State<PartnerValidationPage> {
           ListTile(
             leading: const Icon(Icons.verified_user, color: Colors.orange),
             title: Text('Validation', style: GoogleFonts.poppins()),
-            onTap: () => context.pop(),
+            onTap: () => safePop(context),
           ),
           ListTile(
             leading: const Icon(Icons.people, color: AppColors.blueBic),

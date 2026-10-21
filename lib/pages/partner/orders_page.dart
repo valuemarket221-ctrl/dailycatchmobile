@@ -5,6 +5,7 @@ import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
 import 'package:myapp/providers/partner_provider.dart';
 import 'package:myapp/services/partner_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
 import 'package:myapp/utils/formatters.dart';
 
 class PartnerOrdersPage extends StatefulWidget {
@@ -15,7 +16,7 @@ class PartnerOrdersPage extends StatefulWidget {
 }
 
 class _PartnerOrdersPageState extends State<PartnerOrdersPage> {
-  static const _storeId = 'store_port';
+  static const _fallbackStoreId = 'store_port';
   final PartnerApiService _partnerApiService = PartnerApiService();
   String _filter = 'Tous';
   bool _isLoading = true;
@@ -30,8 +31,9 @@ class _PartnerOrdersPageState extends State<PartnerOrdersPage> {
 
   Future<void> _loadReservations() async {
     try {
+      final storeId = await _resolveStoreId();
       final reservations = await _partnerApiService.getStoreReservations(
-        _storeId,
+        storeId,
       );
       if (!mounted) return;
       setState(() {
@@ -43,10 +45,23 @@ class _PartnerOrdersPageState extends State<PartnerOrdersPage> {
       if (!mounted) return;
       setState(() {
         _apiOrders = null;
-        _loadError = 'Backend indisponible: réservations de démonstration';
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Backend indisponible: réservations de démonstration'
+                : 'Réservations vendeur indisponibles.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<String> _resolveStoreId() async {
+    final storeContext = await _partnerApiService.getMyStoreContext();
+    if (storeContext != null) return storeContext.storeId;
+    if (ApiEnvironment.isDemoFallbackAllowed) return _fallbackStoreId;
+    throw const PartnerApiException(
+      statusCode: 404,
+      message: 'partner_profile_missing',
+    );
   }
 
   @override
@@ -291,7 +306,11 @@ class _PartnerOrdersPageState extends State<PartnerOrdersPage> {
   }
 
   Widget _buildOrdersTable(BuildContext context, PartnerProvider provider) {
-    final sourceOrders = _apiOrders ?? provider.orders;
+    final sourceOrders =
+        _apiOrders ??
+        (ApiEnvironment.isDemoFallbackAllowed
+            ? provider.orders
+            : const <Order>[]);
     final orders =
         _filter == 'Tous'
             ? sourceOrders

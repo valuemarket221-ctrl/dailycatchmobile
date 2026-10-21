@@ -1,58 +1,88 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:myapp/models/product_offer.dart';
 import 'package:myapp/models/store.dart';
+import 'package:myapp/services/product_offer_api_service.dart';
 
-/// Repository pour les boutiques partenaires
-/// Essaie Firestore en premier, sinon utilise les données mock
+/// Repository pour les boutiques partenaires.
+/// Source principale: API backend product-offers.
 class StoreRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String _collection = 'stores';
+  StoreRepository({
+    ProductOfferApiService? productOfferApiService,
+    bool? demoFallbackAllowed,
+  }) : _productOfferApiService =
+           productOfferApiService ?? ProductOfferApiService();
 
-  /// Stream temps-réel des boutiques depuis Firestore
-  Stream<List<Store>> storesStream() {
-    return _firestore
-        .collection(_collection)
-        .snapshots()
-        .map((snapshot) {
-      if (snapshot.docs.isEmpty) return Store.getMockStores();
-      return snapshot.docs.map((doc) => Store.fromFirestore(doc)).toList();
-    }).handleError((e) {
-      debugPrint('StoreRepository error: $e');
-      return Store.getMockStores();
-    });
+  final ProductOfferApiService _productOfferApiService;
+
+  Stream<List<Store>> storesStream() async* {
+    yield await _loadStores();
   }
 
-  /// Récupère une boutique par son ID
   Future<Store?> getStore(String id) async {
-    try {
-      final doc = await _firestore.collection(_collection).doc(id).get();
-      if (doc.exists) return Store.fromFirestore(doc);
-      // Fallback mock
-      return Store.getMockStores().where((s) => s.id == id).firstOrNull;
-    } catch (e) {
-      debugPrint('getStore error: $e');
-      return Store.getMockStores().where((s) => s.id == id).firstOrNull;
-    }
+    final stores = await _loadStores();
+    return stores.where((store) => store.id == id).firstOrNull;
   }
 
-  /// Récupère les boutiques par catégorie
   Future<List<Store>> getByCategory(String category) async {
-    try {
-      final snapshot = await _firestore
-          .collection(_collection)
-          .where('category', isEqualTo: category)
-          .get();
-      if (snapshot.docs.isEmpty) {
-        return Store.getMockStores()
-            .where((s) => s.category == category)
-            .toList();
-      }
-      return snapshot.docs.map((doc) => Store.fromFirestore(doc)).toList();
-    } catch (e) {
-      debugPrint('getByCategory error: $e');
-      return Store.getMockStores()
-          .where((s) => s.category == category)
-          .toList();
+    final stores = await _loadStores();
+    return stores.where((store) => store.category == category).toList();
+  }
+
+  Future<List<Store>> _loadStores() async {
+    final offers = await _productOfferApiService.getProductOffers();
+    return _storesFromOffers(offers);
+  }
+
+  List<Store> _storesFromOffers(List<ProductOffer> offers) {
+    final firstOfferByStore = <String, ProductOffer>{};
+    final quantityByStore = <String, int>{};
+    for (final offer in offers) {
+      firstOfferByStore.putIfAbsent(offer.storeId, () => offer);
+      quantityByStore.update(
+        offer.storeId,
+        (current) => current + offer.availableQuantity,
+        ifAbsent: () => offer.availableQuantity,
+      );
     }
+
+    return firstOfferByStore.entries.map((entry) {
+      final offer = entry.value;
+      final image = offer.mediaUrls.isNotEmpty ? offer.mediaUrls.first : '';
+      return Store(
+        id: offer.storeId,
+        name: offer.storeName,
+        category:
+            offer.category?.trim().isNotEmpty == true
+                ? offer.category!.trim()
+                : 'Non renseignée',
+        distance:
+            offer.distanceKm == null
+                ? 'Distance indisponible'
+                : '${offer.distanceKm!.toStringAsFixed(1)} km',
+        originalPrice: offer.originalPrice,
+        discountedPrice: offer.price,
+        pickupTime: _pickupTime(offer.pickupStartsAt, offer.pickupEndsAt),
+        productsLeft: quantityByStore[offer.storeId] ?? offer.availableQuantity,
+        image: image,
+        banner: image,
+        rating: offer.storeRating,
+        productsCount:
+            quantityByStore[offer.storeId] ?? offer.availableQuantity,
+        productTypes: [
+          offer.category?.trim().isNotEmpty == true
+              ? offer.category!.trim()
+              : 'Non renseignée',
+          'Panier surprise',
+        ],
+        lat: offer.hasValidCoordinates ? offer.latitude : null,
+        lng: offer.hasValidCoordinates ? offer.longitude : null,
+      );
+    }).toList();
+  }
+
+  String _pickupTime(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return 'Créneau non renseigné';
+    String hhmm(DateTime date) =>
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${hhmm(start.toLocal())} - ${hhmm(end.toLocal())}';
   }
 }

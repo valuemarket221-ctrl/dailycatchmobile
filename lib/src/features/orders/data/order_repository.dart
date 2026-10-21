@@ -1,27 +1,23 @@
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:myapp/services/payment_api_service.dart';
 import 'package:myapp/src/features/discovery/domain/basket.dart';
 
 class OrderRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  OrderRepository({PaymentApiService? paymentApiService})
+    : _paymentApiService = paymentApiService ?? PaymentApiService();
+
+  final PaymentApiService _paymentApiService;
 
   Future<void> createOrder(Basket basket) async {
-    User? user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('User not logged in');
-    }
-
-    await _firestore.collection('orders').add({
-      'userId': user.uid,
-      'basketId': basket.id,
-      'basketName': basket.name,
-      'partnerName': basket.partnerName,
-      'price': basket.price,
-      'pickupTime': basket.pickupTime,
-      'orderDate': Timestamp.now(),
-      'image': basket.image,
-    });
+    await _paymentApiService.createOrder(
+      CreateOrderRequest(
+        pickupSlot: basket.pickupTime,
+        deliveryMode: 'pickup',
+        idempotencyKey:
+            'legacy_${basket.id}_${DateTime.now().microsecondsSinceEpoch}',
+        items: [
+          CreateOrderItemRequest(productId: basket.id, quantity: 1),
+        ],
+      ),
+    );
   }
 }

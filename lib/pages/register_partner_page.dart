@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:myapp/demo/demo_mode.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/auth_api_service.dart';
+import 'package:myapp/services/backend_api_client.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/utils/api_error_messages.dart';
+import 'package:myapp/utils/local_auth_session.dart';
 import 'package:myapp/utils/validators.dart';
 import 'package:myapp/widgets/action_button.dart';
 
@@ -93,6 +98,16 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
         _isLoading = true;
       });
 
+      if (DemoMode.enabled) {
+        final route = await LocalAuthSession.registerDemo(
+          email: _emailController.text,
+          password: _passwordController.text,
+          name: _ownerNameController.text,
+          role: 'partner',
+        );
+        if (mounted) context.go(route);
+        return;
+      }
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
@@ -102,43 +117,23 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
         _ownerNameController.text.trim(),
       );
 
-      final userId = credential.user!.uid;
-      final now = FieldValue.serverTimestamp();
-      await FirebaseFirestore.instance
-          .collection('partner_applications')
-          .doc(userId)
-          .set({
-            'userId': userId,
-            'status': 'pending_review',
-            'ownerName': _ownerNameController.text.trim(),
-            'ownerPhone': _ownerPhoneController.text.trim(),
-            'email': _emailController.text.trim(),
-            'storeName': _storeNameController.text.trim(),
-            'category': _selectedCategory,
-            'description': _descriptionController.text.trim(),
-            'address': _addressController.text.trim(),
-            'city': _cityController.text.trim(),
-            'storePhone': _phoneController.text.trim(),
-            'siret': _siretController.text.trim(),
-            'vat': _vatController.text.trim(),
-            'iban': _bankController.text.trim(),
-            'website': _websiteController.text.trim(),
-            'createdAt': now,
-            'updatedAt': now,
-          });
-
-      await FirebaseFirestore.instance.collection('users').doc(userId).set({
-        'role': 'client',
-        'requestedRole': 'partner',
-        'partnerApplicationStatus': 'pending_review',
-        'name': _ownerNameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone': _ownerPhoneController.text.trim(),
-        'createdAt': now,
-        'updatedAt': now,
-      });
-
-      await FirebaseAuth.instance.signOut();
+      await credential.user?.getIdToken(true);
+      final session = await AuthApiService().registerPartner(
+        displayName: _ownerNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _ownerPhoneController.text.trim(),
+        ownerName: _ownerNameController.text.trim(),
+        storeName: _storeNameController.text.trim(),
+        commerceType: _commerceTypeForCategory(_selectedCategory),
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+        storePhone: _phoneController.text.trim(),
+        description: _descriptionController.text.trim(),
+      );
+      await LocalAuthSession.saveBackendSession(
+        user: session.user,
+        homeRoute: session.homeRoute,
+      );
 
       if (!mounted) return;
 
@@ -149,19 +144,26 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Demande vendeur envoyée. Connectez-vous après validation admin.',
+            'Demande vendeur envoyée. Votre dossier est en attente de validation.',
           ),
           backgroundColor: Color(0xFF10B981),
         ),
       );
 
-      context.go('/login');
+      context.go(session.homeRoute);
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
         _showErrorSnackBar(_friendlyAuthError(e.code));
+      }
+    } on BackendApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorSnackBar(ApiErrorMessages.fromCode(e.code));
       }
     } catch (e) {
       if (mounted) {
@@ -173,6 +175,16 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
         );
       }
     }
+  }
+
+  String _commerceTypeForCategory(String category) {
+    return switch (category) {
+      'Poissonnerie' => 'fish_shop',
+      'Restaurant' => 'restaurant',
+      'Supermarché' => 'supermarket',
+      'Autre' => 'other',
+      _ => 'fishmonger',
+    };
   }
 
   String _friendlyAuthError(String code) {
@@ -207,7 +219,7 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
     }
 
     if (context.canPop()) {
-      context.pop();
+      safePop(context);
       return;
     }
 

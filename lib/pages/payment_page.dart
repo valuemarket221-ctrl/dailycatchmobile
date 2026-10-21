@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/demo/demo_mode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/providers/cart_provider.dart';
@@ -49,6 +51,7 @@ class _PaymentPageState extends State<PaymentPage> {
       widget.paymentData?['deliveryMode']?.toString() ?? 'pickup';
 
   bool get _canPresentPaymentSheet =>
+      !DemoMode.enabled &&
       !kIsWeb &&
       _selectedMethod == 'card' &&
       ApiEnvironment.stripePublishableKey.isNotEmpty;
@@ -140,6 +143,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<bool> _presentPaymentSheetIfAvailable(String orderId) async {
+    if (DemoMode.enabled) return true;
     if (!_canPresentPaymentSheet) return false;
 
     final intent = await _paymentApiService.createPaymentIntent(
@@ -156,6 +160,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   String _actionLabel(double total) {
+    if (DemoMode.enabled) return 'Simuler le paiement';
     final amount = AppFormatters.formatCfa(total);
     if (_canPresentPaymentSheet) return 'Payer $amount';
     return 'Réserver $amount';
@@ -178,7 +183,7 @@ class _PaymentPageState extends State<PaymentPage> {
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => safePop(context),
                       icon: const Icon(
                         Icons.arrow_back,
                         color: AppColors.blueBic,

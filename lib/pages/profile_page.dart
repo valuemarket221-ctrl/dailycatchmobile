@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/client_api_service.dart';
+import 'package:myapp/services/notification_api_service.dart';
 import 'package:myapp/utils/local_auth_session.dart';
 import 'package:myapp/utils/profile_photo_store.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
@@ -16,10 +18,45 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final ClientApiService _clientApiService = ClientApiService();
+  final NotificationApiService _notificationApiService =
+      NotificationApiService();
+  var _displayName = 'DailyCatch';
+  int? _unreadNotifications;
+
   @override
   void initState() {
     super.initState();
     ProfilePhotoStore.load();
+    _loadProfileHeader();
+  }
+
+  Future<void> _loadProfileHeader() async {
+    var name = await LocalAuthSession.displayName();
+    try {
+      final profile = await _clientApiService.getMyProfile();
+      name = profile.displayName;
+      await LocalAuthSession.updateProfileSnapshot(
+        name: profile.displayName,
+        email: profile.email,
+        phone: profile.phone ?? '',
+      );
+    } catch (_) {
+      name = await LocalAuthSession.displayName();
+    }
+
+    var unreadCount = 0;
+    try {
+      final notifications = await _notificationApiService.getMyNotifications();
+      unreadCount = notifications.where((item) => !item.isRead).length;
+    } catch (_) {
+      unreadCount = 0;
+    }
+    if (!mounted) return;
+    setState(() {
+      _displayName = name;
+      _unreadNotifications = unreadCount;
+    });
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -33,6 +70,7 @@ class _ProfilePageState extends State<ProfilePage> {
       (Icons.calendar_month_outlined, 'Mes réservations', '/pickup'),
       (Icons.favorite_border, 'Mes favoris', '/favorites'),
       (Icons.location_on_outlined, 'Mes adresses', '/addresses'),
+      (Icons.grid_view_outlined, 'Catégories', '/categories'),
       (Icons.info_outline, 'Mes informations', '/edit-profile'),
       (Icons.credit_card_outlined, 'Paiement', '/payment-methods'),
       (Icons.settings_outlined, 'Paramètres', '/settings'),
@@ -54,6 +92,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     Text('Mon profil', style: _title),
                     const SizedBox(height: 24),
                     _ProfileHeader(
+                      displayName: _displayName,
+                      unreadNotifications: _unreadNotifications,
                       onTapProfile: () => context.push('/edit-profile'),
                       onTapNotifications: () => context.push('/notifications'),
                     ),
@@ -90,10 +130,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
+    required this.displayName,
+    required this.unreadNotifications,
     required this.onTapProfile,
     required this.onTapNotifications,
   });
 
+  final String displayName;
+  final int? unreadNotifications;
   final VoidCallback onTapProfile;
   final VoidCallback onTapNotifications;
 
@@ -112,7 +156,7 @@ class _ProfileHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Amadou Fall', style: _name),
+                    Text(displayName, style: _name),
                     Text('Voir mon profil', style: _sub),
                   ],
                 ),
@@ -132,7 +176,7 @@ class _ProfileHeader extends StatelessWidget {
             color: const Color(0xFFF4F8F7),
             borderRadius: BorderRadius.circular(21),
           ),
-          child: Text('2', style: _name),
+          child: Text('${unreadNotifications ?? 0}', style: _name),
         ),
       ),
     ],

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/admin_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
+import 'package:myapp/utils/api_environment.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -57,35 +58,47 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _metrics = const AdminMetrics(
-          activeOffers: 24,
-          lowStockOffers: 8,
-          paidOrders: 156,
-          pickedUpOrders: 1247,
-          refundPendingOrders: 2,
-          openSupportTickets: 6,
-          highRiskEvents: 3,
-          grossRevenue: 4589050,
-          queuedNotifications: 4,
-          failedNotifications: 1,
-          sentNotificationsToday: 18,
-        );
-        _notificationFailures = [
-          {
-            'title': 'Rappel retrait',
-            'failureReason': 'no_active_push_token',
-            'deliveryAttempts': 1,
-          },
-        ];
-        _auditEvents = [
-          {
-            'action': 'partner_application_approved',
-            'targetType': 'partner_application',
-            'targetId': 'demo_partner',
-            'actorUserId': 'admin_demo',
-          },
-        ];
-        _loadError = 'Backend indisponible: données de démonstration affichées';
+        _metrics =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? const AdminMetrics(
+                  activeOffers: 24,
+                  lowStockOffers: 8,
+                  paidOrders: 156,
+                  pickedUpOrders: 1247,
+                  refundPendingOrders: 2,
+                  openSupportTickets: 6,
+                  highRiskEvents: 3,
+                  grossRevenue: 4589050,
+                  queuedNotifications: 4,
+                  failedNotifications: 1,
+                  sentNotificationsToday: 18,
+                )
+                : null;
+        _notificationFailures =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? [
+                  {
+                    'title': 'Rappel retrait',
+                    'failureReason': 'no_active_push_token',
+                    'deliveryAttempts': 1,
+                  },
+                ]
+                : [];
+        _auditEvents =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? [
+                  {
+                    'action': 'partner_application_approved',
+                    'targetType': 'partner_application',
+                    'targetId': 'demo_partner',
+                    'actorUserId': 'admin_demo',
+                  },
+                ]
+                : [];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Backend indisponible: données de démonstration affichées'
+                : 'Données admin indisponibles.';
         _isLoading = false;
       });
     }

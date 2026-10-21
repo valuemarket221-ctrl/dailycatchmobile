@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/notification_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 
 class NotificationPage extends StatefulWidget {
@@ -17,7 +19,12 @@ class _NotificationPageState extends State<NotificationPage> {
       NotificationApiService();
   var _isLoading = true;
   String? _loadError;
-  List<_NotificationListItem> _items = const [
+  List<_NotificationListItem> _items =
+      ApiEnvironment.isDemoFallbackAllowed
+          ? List<_NotificationListItem>.of(_fallbackItems)
+          : <_NotificationListItem>[];
+
+  static const _fallbackItems = [
     _NotificationListItem(
       title: 'Votre commande à Poissonnerie Yoff',
       body: 'est prête à être récupérée.',
@@ -103,11 +110,7 @@ class _NotificationPageState extends State<NotificationPage> {
     if (!mounted) return;
     context.push(
       '/notification-detail',
-      extra: {
-        'title': item.title,
-        'body': item.body,
-        'orderId': item.orderId,
-      },
+      extra: {'title': item.title, 'body': item.body, 'orderId': item.orderId},
     );
   }
 
@@ -115,8 +118,7 @@ class _NotificationPageState extends State<NotificationPage> {
     final previousItems = _items;
     setState(() {
       _items = [
-        for (final notification in _items)
-          notification.copyWith(isRead: true),
+        for (final notification in _items) notification.copyWith(isRead: true),
       ];
     });
 
@@ -146,7 +148,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 children: [
                   if (context.canPop())
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => safePop(context),
                       icon: const Icon(
                         Icons.arrow_back,
                         color: AppColors.blueBic,
@@ -330,9 +332,15 @@ class _NotificationNotice extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Notifications hors ligne pour le moment.', style: _body),
+            child: Text(
+              'Notifications hors ligne pour le moment.',
+              style: _body,
+            ),
           ),
-          TextButton(onPressed: onRetry, child: Text('Réessayer', style: _link)),
+          TextButton(
+            onPressed: onRetry,
+            child: Text('Réessayer', style: _link),
+          ),
         ],
       ),
     );

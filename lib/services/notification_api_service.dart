@@ -34,27 +34,18 @@ class NotificationSummary {
 
   factory NotificationSummary.fromJson(Map<String, dynamic> json) {
     return NotificationSummary(
-      id: json['id'].toString(),
-      orderId: json['orderId'] as String?,
-      type: json['type'] as String,
-      title: json['title'] as String,
-      body: json['body'] as String,
-      status: json['status'] as String,
-      deliveryAttempts: json['deliveryAttempts'] as int? ?? 0,
-      lastAttemptAt:
-          json['lastAttemptAt'] == null
-              ? null
-              : DateTime.parse(json['lastAttemptAt'] as String),
-      deliveredAt:
-          json['deliveredAt'] == null
-              ? null
-              : DateTime.parse(json['deliveredAt'] as String),
-      failureReason: json['failureReason'] as String?,
-      readAt:
-          json['readAt'] == null
-              ? null
-              : DateTime.parse(json['readAt'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      id: BackendApiClient.requireString(json, 'id'),
+      orderId: json['orderId']?.toString(),
+      type: BackendApiClient.requireString(json, 'type'),
+      title: BackendApiClient.requireString(json, 'title'),
+      body: BackendApiClient.requireString(json, 'body'),
+      status: BackendApiClient.requireString(json, 'status'),
+      deliveryAttempts: BackendApiClient.requireInt(json, 'deliveryAttempts'),
+      lastAttemptAt: _optionalDate(json['lastAttemptAt']),
+      deliveredAt: _optionalDate(json['deliveredAt']),
+      failureReason: json['failureReason']?.toString(),
+      readAt: _optionalDate(json['readAt']),
+      createdAt: BackendApiClient.requireDate(json, 'createdAt'),
     );
   }
 
@@ -88,22 +79,26 @@ class NotificationApiService {
   Future<List<NotificationSummary>> getMyNotifications() async {
     final body = await _getJson('/api/v1/notifications/me');
 
-    return (body['notifications'] as List<dynamic>)
-        .map(
-          (item) => NotificationSummary.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    return _parse(
+      () =>
+          BackendApiClient.requireObjectList(
+            body,
+            'notifications',
+          ).map(NotificationSummary.fromJson).toList(),
+    );
   }
 
   Future<DateTime> markAsRead(String notificationId) async {
     final body = await _postJson('/api/v1/notifications/$notificationId/read');
-    final notification = body['notification'] as Map<String, dynamic>;
-    return DateTime.parse(notification['readAt'] as String);
+    return _parse(() {
+      final notification = BackendApiClient.requireObject(body, 'notification');
+      return BackendApiClient.requireDate(notification, 'readAt');
+    });
   }
 
   Future<int> markAllAsRead() async {
     final body = await _postJson('/api/v1/notifications/read-all');
-    return body['updatedCount'] as int;
+    return _parse(() => BackendApiClient.requireInt(body, 'updatedCount'));
   }
 
   Future<Map<String, dynamic>> _postJson(String path) async {
@@ -121,6 +116,25 @@ class NotificationApiService {
       throw NotificationApiException.fromBackend(error);
     }
   }
+
+  T _parse<T>(T Function() parser) {
+    try {
+      return parser();
+    } on BackendApiException catch (error) {
+      throw NotificationApiException.fromBackend(error);
+    } catch (_) {
+      throw const NotificationApiException(
+        statusCode: 200,
+        message: 'invalid_backend_response',
+      );
+    }
+  }
+}
+
+DateTime? _optionalDate(Object? value) {
+  final text = value?.toString();
+  if (text == null || text.isEmpty) return null;
+  return DateTime.tryParse(text);
 }
 
 class NotificationApiException implements Exception {

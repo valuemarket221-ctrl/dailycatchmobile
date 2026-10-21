@@ -30,65 +30,102 @@ class AdminMetrics {
 
   factory AdminMetrics.fromJson(Map<String, dynamic> json) {
     return AdminMetrics(
-      activeOffers: json['activeOffers'] as int,
-      lowStockOffers: json['lowStockOffers'] as int,
-      paidOrders: json['paidOrders'] as int,
-      pickedUpOrders: json['pickedUpOrders'] as int,
-      refundPendingOrders: json['refundPendingOrders'] as int,
-      openSupportTickets: json['openSupportTickets'] as int,
-      highRiskEvents: json['highRiskEvents'] as int,
-      grossRevenue: json['grossRevenue'] as int,
-      queuedNotifications: json['queuedNotifications'] as int,
-      failedNotifications: json['failedNotifications'] as int,
-      sentNotificationsToday: json['sentNotificationsToday'] as int,
+      activeOffers: _int(json['activeOffers']),
+      lowStockOffers: _int(json['lowStockOffers']),
+      paidOrders: _int(json['paidOrders']),
+      pickedUpOrders: _int(json['pickedUpOrders']),
+      refundPendingOrders: _int(json['refundPendingOrders']),
+      openSupportTickets: _int(json['openSupportTickets']),
+      highRiskEvents: _int(json['highRiskEvents']),
+      grossRevenue: _int(json['grossRevenue']),
+      queuedNotifications: _int(json['queuedNotifications']),
+      failedNotifications: _int(json['failedNotifications']),
+      sentNotificationsToday: _int(json['sentNotificationsToday']),
     );
   }
+
+  static int _int(Object? value) => value is num ? value.toInt() : 0;
 }
 
 class AdminApiService {
-  AdminApiService({http.Client? client, String? baseUrl})
-    : _api = BackendApiClient(client: client, baseUrl: baseUrl);
+  AdminApiService({http.Client? client, String? baseUrl, BackendApiClient? api})
+    : _api = api ?? BackendApiClient(client: client, baseUrl: baseUrl);
 
   final BackendApiClient _api;
 
   Future<AdminMetrics> getMetrics() async {
     final body = await _getJson('/api/v1/admin/metrics');
-    return AdminMetrics.fromJson(body['metrics'] as Map<String, dynamic>);
+    return AdminMetrics.fromJson(
+      BackendApiClient.requireObject(body, 'metrics'),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getUsers({
+    String? role,
+    bool? active,
+    String? search,
+    int limit = 100,
+  }) async {
+    try {
+      final body = await _api.get(
+        '/api/v1/admin/users',
+        queryParameters: {
+          'role': role,
+          'active': active?.toString(),
+          'search': search,
+          'limit': limit.toString(),
+        },
+      );
+      return BackendApiClient.requireObjectList(body, 'users');
+    } on BackendApiException catch (error) {
+      throw AdminApiException.fromBackend(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> updateUser({
+    required String userId,
+    String? role,
+    bool? active,
+  }) {
+    return _patchJson('/api/v1/admin/users/$userId', {
+      if (role != null && role.isNotEmpty) 'role': role,
+      if (active != null) 'active': active,
+    });
   }
 
   Future<List<Map<String, dynamic>>> getSupportTickets() async {
     final body = await _getJson('/api/v1/admin/support/tickets');
-    return (body['tickets'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'tickets');
   }
 
   Future<List<Map<String, dynamic>>> getFraudEvents() async {
     final body = await _getJson('/api/v1/admin/fraud-events');
-    return (body['events'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'events');
   }
 
   Future<List<Map<String, dynamic>>> getNotificationFailures() async {
     final body = await _getJson('/api/v1/admin/notifications/failures');
-    return (body['failures'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'failures');
   }
 
   Future<List<Map<String, dynamic>>> getAuditEvents() async {
     final body = await _getJson('/api/v1/admin/audit-events');
-    return (body['events'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'events');
   }
 
   Future<List<Map<String, dynamic>>> getPartnerApplications() async {
     final body = await _getJson('/api/v1/admin/partner-applications');
-    return (body['applications'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'applications');
   }
 
   Future<List<Map<String, dynamic>>> getPartnerProfiles() async {
     final body = await _getJson('/api/v1/admin/partners/profiles');
-    return (body['profiles'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'profiles');
   }
 
   Future<List<Map<String, dynamic>>> getPartnerDocuments() async {
     final body = await _getJson('/api/v1/admin/partners/documents');
-    return (body['documents'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'documents');
   }
 
   Future<Map<String, dynamic>> updatePartnerProfileStatus({

@@ -24,7 +24,59 @@ void main() {
       capturedRequest.url.toString(),
       'http://127.0.0.1:8080/api/v1/orders/me',
     );
+    expect(capturedRequest.headers['x-dailycatch-client'], 'flutter');
     expect(capturedRequest.headers['authorization'], 'Bearer firebase-token');
+  });
+
+  test('validates expected object lists', () {
+    final body = {
+      'offers': [
+        {'id': 'offer_1'},
+      ],
+    };
+
+    expect(BackendApiClient.requireObjectList(body, 'offers'), [
+      {'id': 'offer_1'},
+    ]);
+    expect(
+      () => BackendApiClient.requireObjectList({
+        'offers': ['bad'],
+      }, 'offers'),
+      throwsA(
+        isA<BackendApiException>().having(
+          (error) => error.code,
+          'code',
+          'invalid_backend_response',
+        ),
+      ),
+    );
+  });
+
+  test('validates required primitive response fields', () {
+    final body = {
+      'id': 'ord_1',
+      'amount': 3000,
+      'active': true,
+      'createdAt': '2026-08-16T16:30:00.000Z',
+    };
+
+    expect(BackendApiClient.requireString(body, 'id'), 'ord_1');
+    expect(BackendApiClient.requireInt(body, 'amount'), 3000);
+    expect(BackendApiClient.requireBool(body, 'active'), true);
+    expect(
+      BackendApiClient.requireDate(body, 'createdAt').toUtc().toIso8601String(),
+      '2026-08-16T16:30:00.000Z',
+    );
+    expect(
+      () => BackendApiClient.requireString({'id': ''}, 'id'),
+      throwsA(
+        isA<BackendApiException>().having(
+          (error) => error.code,
+          'code',
+          'invalid_backend_response',
+        ),
+      ),
+    );
   });
 
   test('does not send bearer token for public requests', () async {
@@ -84,6 +136,24 @@ void main() {
             .having((error) => error.code, 'code', 'backend_http_502'),
       ),
     );
+  });
+
+  test('accepts successful empty responses', () async {
+    final client = MockClient((request) async {
+      return http.Response('', 204);
+    });
+
+    final api = BackendApiClient(
+      client: client,
+      tokenProvider: () async => 'firebase-token',
+    );
+
+    final body = await api.post(
+      '/api/v1/notifications/device-tokens',
+      body: {'platform': 'android', 'token': 'fcm-token'},
+    );
+
+    expect(body, isEmpty);
   });
 
   test('rejects successful responses that are not JSON objects', () async {

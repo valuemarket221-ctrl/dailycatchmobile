@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/admin_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 
 /// Partners Management Page - Clone TGTG Style
@@ -16,6 +18,16 @@ class AdminPartnersPage extends StatefulWidget {
 class _AdminPartnersPageState extends State<AdminPartnersPage> {
   int _selectedTab = 0; // 0 = Tous, 1 = Actifs, 2 = En attente, 3 = Inactifs
   final TextEditingController _searchController = TextEditingController();
+  final AdminApiService _adminApiService = AdminApiService();
+  var _partners = <Map<String, dynamic>>[];
+  var _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartners();
+  }
 
   @override
   void dispose() {
@@ -23,90 +35,49 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
     super.dispose();
   }
 
-  // Mock data for partners
-  final List<Map<String, dynamic>> _partners = [
-    {
-      'id': 'P001',
-      'name': 'DailyCatch Store',
-      'owner': 'Ibrahima Aidara',
-      'category': 'Poissonnerie',
-      'email': 'contact@dailycatch.com',
-      'phone': '+221 77 123 45 67',
-      'address': '15 Rue du Port, Dakar',
-      'status': 'active',
-      'rating': 4.5,
-      'ordersCount': 245,
-      'revenue': 12500.50,
-      'joinedDate': DateTime.now().subtract(const Duration(days: 60)),
-    },
-    {
-      'id': 'P002',
-      'name': 'Poissonnerie du Port',
-      'owner': 'Mamadou Diop',
-      'category': 'Fruits de mer',
-      'email': 'contact@portpoisson.com',
-      'phone': '+221 77 234 56 78',
-      'address': '28 Avenue de la Plage, Dakar',
-      'status': 'active',
-      'rating': 4.8,
-      'ordersCount': 189,
-      'revenue': 9800.25,
-      'joinedDate': DateTime.now().subtract(const Duration(days: 45)),
-    },
-    {
-      'id': 'P003',
-      'name': 'Ocean Fresh',
-      'owner': 'Fatou Sall',
-      'category': 'Poisson',
-      'email': 'hello@oceanfresh.sn',
-      'phone': '+221 77 345 67 89',
-      'address': '42 Quai des Pêcheurs',
-      'status': 'pending',
-      'rating': 0,
-      'ordersCount': 0,
-      'revenue': 0,
-      'joinedDate': DateTime.now().subtract(const Duration(days: 3)),
-    },
-    {
-      'id': 'P004',
-      'name': 'Le Marché de la Mer',
-      'owner': 'Cheikh Ndiaye',
-      'category': 'Crustacés',
-      'email': 'info@marchemer.sn',
-      'phone': '+221 77 456 78 90',
-      'address': '10 Boulevard de la Corniche',
-      'status': 'active',
-      'rating': 4.2,
-      'ordersCount': 156,
-      'revenue': 7650.00,
-      'joinedDate': DateTime.now().subtract(const Duration(days: 30)),
-    },
-    {
-      'id': 'P005',
-      'name': 'Coquillages & Crustacés',
-      'owner': 'Aissatou Diallo',
-      'category': 'Coquillages',
-      'email': 'contact@coquillages.sn',
-      'phone': '+221 77 567 89 01',
-      'address': '55 Rue des Coquillages',
-      'status': 'inactive',
-      'rating': 3.9,
-      'ordersCount': 78,
-      'revenue': 4200.75,
-      'joinedDate': DateTime.now().subtract(const Duration(days: 90)),
-    },
-  ];
+  Future<void> _loadPartners() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final partners = await _adminApiService.getPartnerProfiles();
+      if (!mounted) return;
+      setState(() {
+        _partners = partners;
+        _isLoading = false;
+      });
+    } on AdminApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.message;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'partners_unavailable';
+        _isLoading = false;
+      });
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredPartners {
     var filtered = _partners;
 
     // Filter by tab
     if (_selectedTab == 1) {
-      filtered = filtered.where((p) => p['status'] == 'active').toList();
+      filtered = filtered.where((p) => p['status'] == 'approved').toList();
     } else if (_selectedTab == 2) {
-      filtered = filtered.where((p) => p['status'] == 'pending').toList();
+      filtered =
+          filtered.where((p) => p['status'] == 'pending_review').toList();
     } else if (_selectedTab == 3) {
-      filtered = filtered.where((p) => p['status'] == 'inactive').toList();
+      filtered =
+          filtered
+              .where(
+                (p) => p['status'] == 'rejected' || p['status'] == 'suspended',
+              )
+              .toList();
     }
 
     // Filter by search
@@ -116,9 +87,10 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
           filtered
               .where(
                 (p) =>
-                    p['name'].toString().toLowerCase().contains(query) ||
-                    p['owner'].toString().toLowerCase().contains(query) ||
-                    p['category'].toString().toLowerCase().contains(query),
+                    _storeName(p).toLowerCase().contains(query) ||
+                    _ownerName(p).toLowerCase().contains(query) ||
+                    (p['commerceType']?.toString().toLowerCase() ?? '')
+                        .contains(query),
               )
               .toList();
     }
@@ -128,11 +100,12 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'active':
+      case 'approved':
         return AppColors.greenTGTG;
-      case 'pending':
+      case 'pending_review':
         return AppTheme.warningColor;
-      case 'inactive':
+      case 'rejected':
+      case 'suspended':
         return AppTheme.errorColor;
       default:
         return Colors.grey;
@@ -141,12 +114,14 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
 
   String _getStatusText(String status) {
     switch (status) {
-      case 'active':
+      case 'approved':
         return 'Actif';
-      case 'pending':
+      case 'pending_review':
         return 'En attente';
-      case 'inactive':
-        return 'Inactif';
+      case 'rejected':
+        return 'Refusé';
+      case 'suspended':
+        return 'Suspendu';
       default:
         return status;
     }
@@ -226,14 +201,35 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
           const SizedBox(height: 8),
           // Partners list
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredPartners.length,
-              itemBuilder: (context, index) {
-                final partner = _filteredPartners[index];
-                return _buildPartnerCard(context, partner);
-              },
-            ),
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _loadError != null
+                    ? _buildStateMessage(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Commerces indisponibles',
+                      message: _loadError!,
+                      actionLabel: 'Réessayer',
+                      onAction: _loadPartners,
+                    )
+                    : _filteredPartners.isEmpty
+                    ? _buildStateMessage(
+                      icon: Icons.storefront_outlined,
+                      title: 'Aucun commerce',
+                      message:
+                          'Aucun compte partenaire ne correspond aux filtres actuels.',
+                    )
+                    : RefreshIndicator(
+                      onRefresh: _loadPartners,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredPartners.length,
+                        itemBuilder: (context, index) {
+                          final partner = _filteredPartners[index];
+                          return _buildPartnerCard(context, partner);
+                        },
+                      ),
+                    ),
           ),
         ],
       ),
@@ -242,9 +238,12 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
 
   Widget _buildSummaryHeader() {
     final activeCount =
-        _partners.where((p) => p['status'] == 'active').length.toString();
+        _partners.where((p) => p['status'] == 'approved').length.toString();
     final pendingCount =
-        _partners.where((p) => p['status'] == 'pending').length.toString();
+        _partners
+            .where((p) => p['status'] == 'pending_review')
+            .length
+            .toString();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -322,8 +321,10 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
   }
 
   Widget _buildPartnerCard(BuildContext context, Map<String, dynamic> partner) {
+    final name = _storeName(partner);
+    final status = partner['status']?.toString() ?? 'pending_review';
     return GestureDetector(
-      onTap: () => context.go('/admin/partners/${partner['id']}'),
+      onTap: () => context.go('/admin/partners/${partner['userId']}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -333,7 +334,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
           boxShadow: AppTheme.shadowSm,
           border: Border.all(
             color:
-                partner['status'] == 'pending'
+                status == 'pending_review'
                     ? AppTheme.warningColor.withValues(alpha: 0.35)
                     : AppTheme.softBorder,
           ),
@@ -352,7 +353,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                   ),
                   child: Center(
                     child: Text(
-                      partner['name'][0],
+                      name[0].toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -371,7 +372,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              partner['name'] as String,
+                              name,
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -387,18 +388,16 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                             ),
                             decoration: BoxDecoration(
                               color: _getStatusColor(
-                                partner['status'] as String,
+                                status,
                               ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _getStatusText(partner['status'] as String),
+                              _getStatusText(status),
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: _getStatusColor(
-                                  partner['status'] as String,
-                                ),
+                                color: _getStatusColor(status),
                               ),
                             ),
                           ),
@@ -406,7 +405,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        partner['category'] as String,
+                        _commerceType(partner),
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           color: Colors.grey[600],
@@ -422,7 +421,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            partner['owner'] as String,
+                            _ownerName(partner),
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -435,7 +434,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                 ),
               ],
             ),
-            if (partner['status'] == 'active') ...[
+            if (status == 'approved') ...[
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
@@ -443,19 +442,23 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
                 children: [
                   _buildMetric(
                     Icons.star,
-                    '${partner['rating']}',
-                    Colors.amber,
+                    partner['city']?.toString().isNotEmpty == true
+                        ? partner['city'].toString()
+                        : '-',
+                    AppColors.blueBic,
                   ),
                   const SizedBox(width: 24),
                   _buildMetric(
                     Icons.shopping_bag,
-                    '${partner['ordersCount']}',
+                    partner['phone']?.toString().isNotEmpty == true
+                        ? partner['phone'].toString()
+                        : '-',
                     AppColors.blueBic,
                   ),
                   const SizedBox(width: 24),
                   _buildMetric(
                     Icons.savings,
-                    '${(partner['revenue'] as double).toStringAsFixed(0)}€',
+                    _dateLabel(partner['createdAt']),
                     AppColors.greenTGTG,
                   ),
                 ],
@@ -484,6 +487,66 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
     );
   }
 
+  String _storeName(Map<String, dynamic> partner) {
+    final value = partner['storeName']?.toString().trim();
+    return value == null || value.isEmpty ? 'Commerce DailyCatch' : value;
+  }
+
+  String _ownerName(Map<String, dynamic> partner) {
+    final value = partner['ownerName']?.toString().trim();
+    return value == null || value.isEmpty ? 'Responsable non renseigné' : value;
+  }
+
+  String _commerceType(Map<String, dynamic> partner) {
+    final value = partner['commerceType']?.toString().trim();
+    return value == null || value.isEmpty ? 'Commerce' : value;
+  }
+
+  String _dateLabel(Object? value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) return '-';
+    return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
+  }
+
+  Widget _buildStateMessage({
+    required IconData icon,
+    required String title,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 42, color: AppColors.blueBic),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.blueBic,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 14),
+              TextButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Drawer _buildDrawer(BuildContext context) {
     return Drawer(
       child: ListView(
@@ -509,7 +572,7 @@ class _AdminPartnersPageState extends State<AdminPartnersPage> {
           ListTile(
             leading: const Icon(Icons.store, color: AppColors.blueBic),
             title: Text('Partenaires', style: GoogleFonts.poppins()),
-            onTap: () => context.pop(),
+            onTap: () => safePop(context),
           ),
           ListTile(
             leading: const Icon(Icons.people, color: AppColors.blueBic),

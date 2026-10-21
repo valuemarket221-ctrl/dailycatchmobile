@@ -40,10 +40,7 @@ void main() {
     final conversations = await service.getConversations();
 
     expect(capturedRequest.method, 'GET');
-    expect(
-      capturedRequest.url.path,
-      '/api/v1/messages/conversations',
-    );
+    expect(capturedRequest.url.path, '/api/v1/messages/conversations');
     expect(capturedRequest.headers['authorization'], 'Bearer client-token');
     expect(conversations.single['id'], 'conv_1');
     expect(conversations.single['lastMessage'], 'Votre commande est prete !');
@@ -77,6 +74,67 @@ void main() {
     );
     expect(body['body'], "Merci, j'arrive.");
     expect(messageId, 'msg_1');
+  });
+
+  test('creates a conversation and marks it as read', () async {
+    final requests = <http.Request>[];
+    final client = MockClient((request) async {
+      requests.add(request);
+
+      if (request.url.path == '/api/v1/messages/conversations') {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['partnerUserId'], 'partner_1');
+        expect(body['storeId'], 'store_yoff');
+        return http.Response('{"conversationId":"conv_1"}', 201);
+      }
+
+      expect(request.url.path, '/api/v1/messages/conversations/conv_1/read');
+      return http.Response('{"updatedCount":3}', 200);
+    });
+
+    final service = MessageApiService(
+      api: BackendApiClient(
+        client: client,
+        baseUrl: 'http://127.0.0.1:8080',
+        tokenProvider: () async => 'client-token',
+      ),
+    );
+
+    final conversationId = await service.createConversation(
+      partnerUserId: 'partner_1',
+      storeId: 'store_yoff',
+    );
+    final updatedCount = await service.markConversationAsRead(conversationId);
+
+    expect(requests, hasLength(2));
+    expect(conversationId, 'conv_1');
+    expect(updatedCount, 3);
+  });
+
+  test('rejects malformed message responses', () async {
+    final client = MockClient((request) async {
+      return http.Response('{"messageId":""}', 201);
+    });
+
+    final service = MessageApiService(
+      api: BackendApiClient(
+        client: client,
+        tokenProvider: () async => 'client-token',
+      ),
+    );
+
+    expect(
+      () => service.sendMessage(conversationId: 'conv_1', body: 'Bonjour'),
+      throwsA(
+        isA<MessageApiException>()
+            .having((error) => error.statusCode, 'statusCode', 200)
+            .having(
+              (error) => error.message,
+              'message',
+              'invalid_backend_response',
+            ),
+      ),
+    );
   });
 
   test('normalizes backend errors', () async {

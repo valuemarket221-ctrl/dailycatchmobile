@@ -114,6 +114,79 @@ class PartnerProfileRequest {
   };
 }
 
+class UploadIntent {
+  const UploadIntent({
+    required this.objectKey,
+    required this.storageUrl,
+    required this.uploadIntentId,
+    required this.uploadExpiresAt,
+    required this.uploadMethod,
+    required this.uploadUrl,
+    this.documentId,
+  });
+
+  final String? documentId;
+  final String objectKey;
+  final String storageUrl;
+  final String uploadIntentId;
+  final DateTime uploadExpiresAt;
+  final String uploadMethod;
+  final String uploadUrl;
+
+  factory UploadIntent.fromJson(Map<String, dynamic> json) {
+    final upload = BackendApiClient.requireObject(json, 'upload');
+    final expiresAt = DateTime.tryParse(
+      _requiredString(json, 'uploadExpiresAt'),
+    );
+    if (expiresAt == null) {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'invalid_backend_response',
+      );
+    }
+
+    final method = _requiredString(upload, 'method');
+    if (method != 'direct_put') {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'unsupported_upload_method',
+      );
+    }
+
+    final uploadUrl = _requiredString(upload, 'url');
+    final uploadExpiresAt = _requiredString(upload, 'expiresAt');
+    if (uploadExpiresAt != json['uploadExpiresAt']?.toString()) {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'invalid_backend_response',
+      );
+    }
+
+    return UploadIntent(
+      documentId: json['documentId']?.toString(),
+      objectKey: _requiredString(json, 'objectKey'),
+      storageUrl: _requiredString(json, 'storageUrl'),
+      uploadIntentId: _requiredString(json, 'uploadIntentId'),
+      uploadExpiresAt: expiresAt,
+      uploadMethod: method,
+      uploadUrl: uploadUrl,
+    );
+  }
+
+  bool get isExpired => DateTime.now().toUtc().isAfter(uploadExpiresAt.toUtc());
+
+  static String _requiredString(Map<String, dynamic> json, String fieldName) {
+    final value = json[fieldName]?.toString().trim() ?? '';
+    if (value.isEmpty) {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'invalid_backend_response',
+      );
+    }
+    return value;
+  }
+}
+
 class PartnerApiService {
   PartnerApiService({
     http.Client? client,
@@ -125,7 +198,7 @@ class PartnerApiService {
 
   Future<String> createOffer(PartnerOfferRequest request) async {
     final body = await _postJson('/api/v1/partner/offers', request.toJson());
-    return body['offerId'] as String;
+    return body['offerId'].toString();
   }
 
   Future<Map<String, dynamic>> updateOffer(
@@ -133,7 +206,7 @@ class PartnerApiService {
     Map<String, dynamic> updates,
   ) async {
     final body = await _patchJson('/api/v1/partner/offers/$offerId', updates);
-    return body['offer'] as Map<String, dynamic>;
+    return BackendApiClient.requireObject(body, 'offer');
   }
 
   Future<Map<String, dynamic>> setOfferActive(String offerId, bool active) {
@@ -142,33 +215,53 @@ class PartnerApiService {
 
   Future<Map<String, dynamic>> deleteOffer(String offerId) async {
     final body = await _deleteJson('/api/v1/partner/offers/$offerId');
-    return body['offer'] as Map<String, dynamic>;
+    return BackendApiClient.requireObject(body, 'offer');
   }
 
   Future<Map<String, dynamic>?> getMyProfile() async {
     final body = await _getJson('/api/v1/partner/profile/me');
-    return body['profile'] as Map<String, dynamic>?;
+    return BackendApiClient.optionalObject(body, 'profile');
+  }
+
+  Future<PartnerStoreContext?> getMyStoreContext() async {
+    final profile = await getMyProfile();
+    if (profile == null) return null;
+    final storeId =
+        profile['storeId']?.toString().trim().isNotEmpty == true
+            ? profile['storeId'].toString().trim()
+            : profile['store_id']?.toString().trim() ?? '';
+    if (storeId.isEmpty) return null;
+    return PartnerStoreContext(
+      storeId: storeId,
+      storeName:
+          profile['storeName']?.toString().trim().isNotEmpty == true
+              ? profile['storeName'].toString().trim()
+              : profile['store_name']?.toString().trim() ?? 'Mon commerce',
+      latitude: _optionalDouble(profile['latitude']),
+      longitude: _optionalDouble(profile['longitude']),
+    );
   }
 
   Future<Map<String, dynamic>> saveMyProfile(
     PartnerProfileRequest request,
   ) async {
     final body = await _putJson('/api/v1/partner/profile/me', request.toJson());
-    return body['profile'] as Map<String, dynamic>;
+    return BackendApiClient.requireObject(body, 'profile');
   }
 
-  Future<Map<String, dynamic>> createDocumentUploadIntent({
+  Future<UploadIntent> createDocumentUploadIntent({
     required String documentType,
     required String fileName,
     required String contentType,
     required int sizeBytes,
   }) async {
-    return _postJson('/api/v1/partner/documents/upload-intent', {
+    final body = await _postJson('/api/v1/partner/documents/upload-intent', {
       'documentType': documentType,
       'fileName': fileName,
       'contentType': contentType,
       'sizeBytes': sizeBytes,
     });
+    return UploadIntent.fromJson(body);
   }
 
   Future<String> uploadDocumentBytes({
@@ -192,21 +285,38 @@ class PartnerApiService {
 
   Future<List<Map<String, dynamic>>> getMyDocuments() async {
     final body = await _getJson('/api/v1/partner/documents/me');
-    return (body['documents'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'documents');
   }
 
-  Future<Map<String, dynamic>> createOfferMediaUploadIntent({
+  Future<List<Map<String, dynamic>>> getPartnerPaymentMethods() async {
+    final body = await _getJson('/api/v1/partner/payment-methods/me');
+    return BackendApiClient.requireObjectList(body, 'paymentMethods');
+  }
+
+  Future<Map<String, dynamic>> createPartnerPaymentMethod(
+    Map<String, dynamic> request,
+  ) async {
+    final body = await _postJson('/api/v1/partner/payment-methods', request);
+    return BackendApiClient.requireObject(body, 'paymentMethod');
+  }
+
+  Future<void> deletePartnerPaymentMethod(String paymentMethodId) async {
+    await _deleteJson('/api/v1/partner/payment-methods/$paymentMethodId');
+  }
+
+  Future<UploadIntent> createOfferMediaUploadIntent({
     required String fileName,
     required String contentType,
     required int sizeBytes,
     String? offerId,
   }) async {
-    return _postJson('/api/v1/partner/offer-media/upload-intent', {
+    final body = await _postJson('/api/v1/partner/offer-media/upload-intent', {
       'fileName': fileName,
       'contentType': contentType,
       'sizeBytes': sizeBytes,
       if (offerId != null) 'offerId': offerId,
     });
+    return UploadIntent.fromJson(body);
   }
 
   Future<String> uploadOfferMediaBytes({
@@ -230,29 +340,90 @@ class PartnerApiService {
 
   Future<List<Map<String, dynamic>>> getStoreOffers(String storeId) async {
     final body = await _getJson('/api/v1/partner/stores/$storeId/offers');
-    return (body['offers'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'offers');
   }
 
   Future<List<Map<String, dynamic>>> getStoreReservations(
     String storeId,
   ) async {
     final body = await _getJson('/api/v1/partner/stores/$storeId/reservations');
-    return (body['reservations'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'reservations');
   }
 
   Future<List<Map<String, dynamic>>> getStorePickups(String storeId) async {
     final body = await _getJson('/api/v1/partner/stores/$storeId/pickups');
-    return (body['pickups'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'pickups');
+  }
+
+  Future<Map<String, dynamic>> getStoreFinanceSummary(String storeId) async {
+    final body = await _getJson(
+      '/api/v1/partner/stores/$storeId/finance/summary',
+    );
+    return BackendApiClient.requireObject(body, 'summary');
+  }
+
+  Future<List<Map<String, dynamic>>> getStoreFinanceTransactions(
+    String storeId, {
+    String? type,
+    int limit = 50,
+  }) async {
+    final body = await _getJson(
+      '/api/v1/partner/stores/$storeId/finance/transactions',
+      queryParameters: {'type': type, 'limit': limit.toString()},
+    );
+    return BackendApiClient.requireObjectList(body, 'transactions');
+  }
+
+  Future<List<Map<String, dynamic>>> getStoreFinanceStatements(
+    String storeId, {
+    int months = 12,
+  }) async {
+    final body = await _getJson(
+      '/api/v1/partner/stores/$storeId/finance/statements',
+      queryParameters: {'months': months.toString()},
+    );
+    return BackendApiClient.requireObjectList(body, 'statements');
+  }
+
+  Future<Map<String, dynamic>> createStoreFinanceStatementDownloadIntent(
+    String storeId,
+    String period,
+  ) async {
+    final body = await _getJson(
+      '/api/v1/partner/stores/$storeId/finance/statements/$period/download-intent',
+    );
+    return BackendApiClient.requireObject(body, 'download');
+  }
+
+  Future<List<Map<String, dynamic>>> getStorePayoutRequests(
+    String storeId,
+  ) async {
+    final body = await _getJson('/api/v1/partner/stores/$storeId/payouts');
+    return BackendApiClient.requireObjectList(body, 'payoutRequests');
+  }
+
+  Future<Map<String, dynamic>> createPartnerPayoutRequest({
+    required String storeId,
+    required String paymentMethodId,
+    required int amount,
+    String currency = 'xof',
+  }) async {
+    final body = await _postJson('/api/v1/partner/stores/$storeId/payouts', {
+      'paymentMethodId': paymentMethodId,
+      'amount': amount,
+      'currency': currency,
+    });
+    return BackendApiClient.requireObject(body, 'payoutRequest');
   }
 
   Future<List<Map<String, dynamic>>> getStorePromotions(String storeId) async {
     final body = await _getJson('/api/v1/partner/stores/$storeId/promotions');
-    return (body['promotions'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return BackendApiClient.requireObjectList(body, 'promotions');
   }
 
   Future<String> createPromotion(Map<String, dynamic> request) async {
     final body = await _postJson('/api/v1/partner/promotions', request);
-    return body['promotionId'] as String;
+    return body['promotionId'].toString();
   }
 
   Future<Map<String, dynamic>> updatePromotion(
@@ -263,7 +434,7 @@ class PartnerApiService {
       '/api/v1/partner/promotions/$promotionId',
       updates,
     );
-    return body['promotion'] as Map<String, dynamic>;
+    return BackendApiClient.requireObject(body, 'promotion');
   }
 
   Future<Map<String, dynamic>> setPromotionActive(
@@ -273,9 +444,12 @@ class PartnerApiService {
     return updatePromotion(promotionId, {'active': active});
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
+  Future<Map<String, dynamic>> _getJson(
+    String path, {
+    Map<String, String?> queryParameters = const {},
+  }) async {
     try {
-      return await _api.get(path);
+      return await _api.get(path, queryParameters: queryParameters);
     } on BackendApiException catch (error) {
       throw PartnerApiException.fromBackend(error);
     }
@@ -323,32 +497,48 @@ class PartnerApiService {
   }
 
   Future<String> _uploadBytesFromIntent({
-    required Map<String, dynamic> intent,
+    required UploadIntent intent,
     required List<int> bytes,
     required String contentType,
   }) async {
-    final upload = intent['upload'] as Map<String, dynamic>?;
-    final uploadUrl = upload?['url'] as String?;
-    if (uploadUrl == null || uploadUrl.isEmpty) {
+    if (intent.isExpired) {
       throw const PartnerApiException(
-        statusCode: 500,
-        message: 'upload_url_missing',
+        statusCode: 410,
+        message: 'upload_intent_expired',
       );
     }
 
     try {
       final body = await _api.putBytes(
-        uploadUrl,
+        intent.uploadUrl,
         bytes: bytes,
         contentType: contentType,
       );
-      return body['storageUrl'] as String? ??
-          intent['storageUrl'] as String? ??
-          uploadUrl;
+      return body['storageUrl'] as String? ?? intent.storageUrl;
     } on BackendApiException catch (error) {
       throw PartnerApiException.fromBackend(error);
     }
   }
+
+  static double? _optionalDouble(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+}
+
+class PartnerStoreContext {
+  const PartnerStoreContext({
+    required this.storeId,
+    required this.storeName,
+    this.latitude,
+    this.longitude,
+  });
+
+  final String storeId;
+  final String storeName;
+  final double? latitude;
+  final double? longitude;
 }
 
 class PartnerApiException implements Exception {

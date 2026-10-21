@@ -16,6 +16,9 @@ class _RateReviewPageState extends State<RateReviewPage> {
   int _selectedAspect = -1;
   final TextEditingController _commentController = TextEditingController();
   final PaymentApiService _paymentApiService = PaymentApiService();
+  var _orders = <OrderSummary>[];
+  var _isLoading = true;
+  String? _loadError;
 
   final List<Map<String, dynamic>> aspects = [
     {'icon': Icons.access_time, 'label': 'Respect de l\'horaire'},
@@ -24,25 +27,40 @@ class _RateReviewPageState extends State<RateReviewPage> {
     {'icon': Icons.inventory_2, 'label': 'Emballage'},
   ];
 
-  final List<Map<String, dynamic>> completedOrders = [
-    {
-      'id': 'CMD-2024-001234',
-      'store': 'Poissonnerie du Port',
-      'date': '04 février 2024',
-      'rated': false,
-    },
-    {
-      'id': 'CMD-2024-001230',
-      'store': 'Boulangerie du Centre',
-      'date': '02 février 2024',
-      'rated': true,
-    },
-  ];
+  List<OrderSummary> get _reviewableOrders =>
+      _orders.where((order) => _canReview(order.status)).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final orders = await _paymentApiService.getMyOrders();
+      if (!mounted) return;
+      setState(() {
+        _orders = orders;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'Avis indisponibles pour le moment.';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -82,32 +100,42 @@ class _RateReviewPageState extends State<RateReviewPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              ...completedOrders
-                  .where((o) => !o['rated'])
-                  .map((order) => _buildOrderCard(order)),
-              if (completedOrders.where((o) => !o['rated']).isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.rate_review_outlined,
-                          size: 64,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Aucun avis à donner',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.grey[500],
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_loadError != null)
+                _buildStateMessage(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Avis indisponibles',
+                  message: _loadError!,
+                  actionLabel: 'Réessayer',
+                  onAction: _loadOrders,
+                )
+              else ...[
+                ..._reviewableOrders.map(_buildOrderCard),
+                if (_reviewableOrders.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.rate_review_outlined,
+                            size: 64,
+                            color: Colors.grey[300],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Text(
+                            'Aucun avis à donner',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+              ],
 
               const SizedBox(height: 32),
 
@@ -157,7 +185,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
+  Widget _buildOrderCard(OrderSummary order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
@@ -192,7 +220,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order['store'],
+                      _storeName(order),
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -200,7 +228,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
                       ),
                     ),
                     Text(
-                      order['date'],
+                      _dateLabel(order),
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         color: Colors.grey[500],
@@ -248,10 +276,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
     );
   }
 
-  void _showRatingBottomSheet(
-    BuildContext context,
-    Map<String, dynamic> order,
-  ) {
+  void _showRatingBottomSheet(BuildContext context, OrderSummary order) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -278,7 +303,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Évaluer ${order['store']}',
+                    'Évaluer ${_storeName(order)}',
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -411,7 +436,7 @@ class _RateReviewPageState extends State<RateReviewPage> {
     );
   }
 
-  Future<void> _submitReview(Map<String, dynamic> order) async {
+  Future<void> _submitReview(OrderSummary order) async {
     if (_rating == 0) return;
 
     final aspect =
@@ -424,11 +449,17 @@ class _RateReviewPageState extends State<RateReviewPage> {
 
     try {
       await _paymentApiService.reviewOrder(
-        orderId: order['id'] as String,
+        orderId: order.id,
         rating: _rating,
         comment: comment.isEmpty ? null : comment,
       );
       if (!mounted) return;
+      setState(() {
+        _orders = _orders.where((item) => item.id != order.id).toList();
+        _rating = 0;
+        _selectedAspect = -1;
+        _commentController.clear();
+      });
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -452,6 +483,71 @@ class _RateReviewPageState extends State<RateReviewPage> {
         ),
       );
     }
+  }
+
+  bool _canReview(String status) {
+    switch (status.toLowerCase()) {
+      case 'picked_up':
+      case 'completed':
+      case 'delivered':
+      case 'fulfilled':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  String _storeName(OrderSummary order) {
+    final firstItem = order.items.isEmpty ? null : order.items.first;
+    return firstItem?['storeName']?.toString() ??
+        firstItem?['store_name']?.toString() ??
+        'Commerce';
+  }
+
+  String _dateLabel(OrderSummary order) {
+    final date = order.createdAt;
+    return '${_twoDigits(date.day)}/${_twoDigits(date.month)}/${date.year}';
+  }
+
+  String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+  Widget _buildStateMessage({
+    required IconData icon,
+    required String title,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Icon(icon, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTip(String text) {

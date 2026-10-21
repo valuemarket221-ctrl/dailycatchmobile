@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:myapp/services/partner_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/utils/api_environment.dart';
 
 class AddPackPage extends StatefulWidget {
   const AddPackPage({super.key});
@@ -22,6 +23,7 @@ class _AddPackPageState extends State<AddPackPage> {
       TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final PartnerApiService _partnerApiService = PartnerApiService();
+  PartnerStoreContext? _storeContext;
 
   DateTime? _expiryDate;
   final List<String> _selectedProducts = [];
@@ -329,10 +331,12 @@ class _AddPackPageState extends State<AddPackPage> {
 
     setState(() => _isLoading = true);
     try {
+      final storeContext = _storeContext ?? await _resolveStoreContext();
+      _storeContext = storeContext;
       await _partnerApiService.createOffer(
         PartnerOfferRequest(
-          storeId: 'store_port',
-          storeName: 'Poissonnerie du Port',
+          storeId: storeContext.storeId,
+          storeName: storeContext.storeName,
           name: _nameController.text.trim(),
           description:
               _descriptionController.text.trim().isEmpty
@@ -343,8 +347,8 @@ class _AddPackPageState extends State<AddPackPage> {
           availableQuantity: quantity,
           pickupStartsAt: _expiryDate,
           pickupEndsAt: _expiryDate?.add(const Duration(hours: 2)),
-          latitude: 14.6928,
-          longitude: -17.4467,
+          latitude: storeContext.latitude,
+          longitude: storeContext.longitude,
         ),
       );
 
@@ -361,11 +365,35 @@ class _AddPackPageState extends State<AddPackPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Backend indisponible: panier conservé en mode démo.'),
-          backgroundColor: Color(0xFFF59E0B),
+        SnackBar(
+          content: Text(
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Backend indisponible: panier conservé en mode démo.'
+                : 'Publication impossible: vérifiez votre connexion et réessayez.',
+          ),
+          backgroundColor:
+              ApiEnvironment.isDemoFallbackAllowed
+                  ? const Color(0xFFF59E0B)
+                  : AppTheme.errorColor,
         ),
       );
     }
+  }
+
+  Future<PartnerStoreContext> _resolveStoreContext() async {
+    final storeContext = await _partnerApiService.getMyStoreContext();
+    if (storeContext != null) return storeContext;
+    if (ApiEnvironment.isDemoFallbackAllowed) {
+      return const PartnerStoreContext(
+        storeId: 'store_port',
+        storeName: 'Poissonnerie du Port',
+        latitude: 14.6928,
+        longitude: -17.4467,
+      );
+    }
+    throw const PartnerApiException(
+      statusCode: 404,
+      message: 'partner_profile_missing',
+    );
   }
 }

@@ -1,10 +1,13 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/client_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/local_auth_session.dart';
 import 'package:myapp/utils/profile_photo_store.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -15,16 +18,21 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  final _name = TextEditingController(text: 'Amadou Fall');
-  final _email = TextEditingController(text: 'amadou.fall@email.sn');
-  final _phone = TextEditingController(text: '+221 77 123 45 67');
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _phone = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
+  final ClientApiService _clientApiService = ClientApiService();
   bool _isPickingPhoto = false;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
     ProfilePhotoStore.load();
+    _loadProfile();
   }
 
   @override
@@ -35,14 +43,84 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Profil mis à jour', style: GoogleFonts.poppins()),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.blueBic,
-      ),
-    );
+  Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final profile = await _clientApiService.getMyProfile();
+      await LocalAuthSession.updateProfileSnapshot(
+        name: profile.displayName,
+        email: profile.email,
+        phone: profile.phone ?? '',
+      );
+      if (!mounted) return;
+      setState(() {
+        _name.text = profile.displayName;
+        _email.text = profile.email;
+        _phone.text = profile.phone ?? '';
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      if (ApiEnvironment.isDemoFallbackAllowed) {
+        final profile = await LocalAuthSession.profileSnapshot();
+        if (!mounted) return;
+        setState(() {
+          _name.text = profile['name'] ?? '';
+          _email.text = profile['email'] ?? '';
+          _phone.text = profile['phone'] ?? '';
+          _loadError = 'Profil local affiché. API indisponible.';
+          _isLoading = false;
+        });
+        return;
+      }
+      setState(() {
+        _loadError = 'Profil indisponible. Vérifiez votre connexion.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final profile = await _clientApiService.updateMyProfile(
+        displayName: _name.text,
+        email: _email.text,
+        phone: _phone.text,
+      );
+      await LocalAuthSession.updateProfileSnapshot(
+        name: profile.displayName,
+        email: profile.email,
+        phone: profile.phone ?? '',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Profil mis à jour', style: GoogleFonts.poppins()),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.blueBic,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossible d’enregistrer le profil',
+            style: GoogleFonts.poppins(),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.blueBic,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _changePhoto() async {
@@ -93,7 +171,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
                 const Spacer(),
@@ -113,6 +191,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
             const SizedBox(height: 12),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  color: AppColors.blueBic,
+                  backgroundColor: Color(0xFFE8F4F2),
+                ),
+              ),
+            if (_loadError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _loadError!,
+                  style: _helper,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             _Input(label: 'Nom complet', controller: _name),
             _Input(label: 'Email', controller: _email),
             _Input(label: 'Téléphone', controller: _phone),
@@ -121,14 +217,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: _save,
+                onPressed: _isSaving || _isLoading ? null : _save,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.blueBic,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text('Enregistrer', style: _button),
+                child: Text(
+                  _isSaving ? 'Enregistrement...' : 'Enregistrer',
+                  style: _button,
+                ),
               ),
             ),
           ],
@@ -215,6 +314,11 @@ final _link = GoogleFonts.poppins(
   fontSize: 12,
   fontWeight: FontWeight.w900,
   color: AppColors.blueBic,
+);
+final _helper = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w700,
+  color: const Color(0xFF6D7F82),
 );
 final _button = GoogleFonts.poppins(
   fontSize: 12,

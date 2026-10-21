@@ -5,6 +5,7 @@ import 'package:myapp/constants.dart';
 import 'package:myapp/data/rescued_product_repository.dart';
 import 'package:myapp/models/rescued_product.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 
 /// Page listant les paniers surprise sauvés du gaspillage.
 class RescuedProductsPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
   String _searchQuery = '';
   String _selectedCategory = 'Tous';
   bool _isLoading = true;
+  bool _hasLoadError = false;
   List<RescuedProduct> _products = [];
 
   final List<String> _categories = [
@@ -37,13 +39,20 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
   }
 
   Future<void> _loadProducts() async {
-    setState(() => _isLoading = true);
-    final products = await _rescuedProductRepository.getAvailableProducts();
-    if (!mounted) return;
     setState(() {
-      _products = products;
-      _isLoading = false;
+      _isLoading = true;
+      _hasLoadError = false;
     });
+    try {
+      final products = await _rescuedProductRepository.getAvailableProducts();
+      if (!mounted) return;
+      setState(() => _products = products);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _hasLoadError = true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   List<RescuedProduct> get _filteredProducts {
@@ -160,6 +169,20 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
             child:
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())
+                    : _hasLoadError
+                    ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Paniers indisponibles pour le moment.'),
+                          TextButton.icon(
+                            onPressed: _loadProducts,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Réessayer'),
+                          ),
+                        ],
+                      ),
+                    )
                     : _filteredProducts.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
@@ -297,17 +320,11 @@ class _RescuedProductsPageState extends State<RescuedProductsPage> {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
-                  child: Image.asset(
-                    product.imageUrl,
+                  child: AppRemoteImage(
+                    path: product.imageUrl,
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder:
-                        (context, error, stackTrace) => Container(
-                          height: 180,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image_not_supported),
-                        ),
                   ),
                 ),
                 Positioned(
@@ -587,17 +604,11 @@ class RescuedProductDetailPage extends StatelessWidget {
             // Image principale
             Stack(
               children: [
-                Image.network(
-                  product.imageUrl,
+                AppRemoteImage(
+                  path: product.imageUrl,
                   height: 300,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder:
-                      (context, error, stackTrace) => Container(
-                        height: 300,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image_not_supported, size: 80),
-                      ),
                 ),
                 Positioned(
                   top: 16,

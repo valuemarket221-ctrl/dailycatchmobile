@@ -1,14 +1,19 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:myapp/demo/demo_mode.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/partner_api_service.dart';
 import 'package:myapp/services/payment_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/widgets/partner_bottom_nav_bar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class _PartnerBasketDraft {
   static String name = 'Panier Poissons du jour';
@@ -47,6 +52,7 @@ class _PartnerMobileDashboardPageState
   bool _isLoading = true;
   String? _loadError;
   Map<String, dynamic>? _profile;
+  Map<String, dynamic>? _financeSummary;
   List<Map<String, dynamic>> _offers = const [];
   List<Map<String, dynamic>> _orders = const [];
 
@@ -63,25 +69,44 @@ class _PartnerMobileDashboardPageState
     });
 
     try {
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        _storeId,
+      );
       final results = await Future.wait<Object?>([
         _partnerApiService.getMyProfile(),
-        _partnerApiService.getStoreOffers(_storeId),
-        _partnerApiService.getStoreReservations(_storeId),
+        _partnerApiService.getStoreOffers(storeContext.storeId),
+        _partnerApiService.getStoreReservations(storeContext.storeId),
+        _partnerApiService.getStoreFinanceSummary(storeContext.storeId),
       ]);
       if (!mounted) return;
       setState(() {
         _profile = results[0] as Map<String, dynamic>?;
         _offers = (results[1] as List<Map<String, dynamic>>);
         _orders = (results[2] as List<Map<String, dynamic>>);
+        _financeSummary = results[3] as Map<String, dynamic>;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _profile = _fallbackPartnerProfile;
-        _offers = _fallbackPartnerOffers;
-        _orders = _fallbackPartnerOrders;
-        _loadError = null;
+        _profile =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerProfile
+                : null;
+        _offers =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerOffers
+                : const <Map<String, dynamic>>[];
+        _orders =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerOrders
+                : const <Map<String, dynamic>>[];
+        _financeSummary = null;
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Dashboard vendeur indisponible.';
         _isLoading = false;
       });
     }
@@ -93,32 +118,48 @@ class _PartnerMobileDashboardPageState
   int get _pendingOrders => _orders.where(_isOpenOrder).length;
 
   int get _soldBaskets =>
+      _financeInt('basketsSold') ??
       _orders.fold<int>(0, (total, order) => total + _orderQuantity(order));
 
   int get _revenue => _orders
       .where((order) => !_isCanceledOrder(order))
       .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
+  int get _grossRevenue => _financeInt('grossRevenue') ?? _revenue;
+
   int get _pendingAmount => _orders
       .where(_isOpenOrder)
       .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
   int get _completedOrders =>
+      _financeInt('completedOrders') ??
       _orders
           .where(
             (order) => _orderTabIndex(order) == 2 && !_isCanceledOrder(order),
           )
           .length;
 
-  int get _commission => (_revenue * .10).round();
+  int get _pendingPayoutAmount =>
+      _financeInt('pendingPayoutAmount') ?? _pendingAmount;
+
+  int get _commission =>
+      _financeInt('commissionAmount') ?? (_revenue * .10).round();
 
   int get _refunds => _orders
       .where(_isCanceledOrder)
       .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
   int get _availableBalance {
+    final apiBalance = _financeInt('availableBalance');
+    if (apiBalance != null) return apiBalance;
     final balance = _revenue - _commission - _refunds;
     return balance < 0 ? 0 : balance;
+  }
+
+  int? _financeInt(String key) {
+    final summary = _financeSummary;
+    if (summary == null || !summary.containsKey(key)) return null;
+    return _intValue(summary[key]);
   }
 
   String get _ownerName => _readString(_profile, const [
@@ -134,7 +175,10 @@ class _PartnerMobileDashboardPageState
   ], 'Poissonnerie Chez Moussa');
 
   String get _rating {
-    final rating = _profile?['averageRating'] ?? _profile?['rating'];
+    final rating =
+        _financeSummary?['averageRating'] ??
+        _profile?['averageRating'] ??
+        _profile?['rating'];
     if (rating is num) return rating.toStringAsFixed(1).replaceAll('.', ',');
     final parsed = double.tryParse('$rating');
     return parsed == null
@@ -168,7 +212,7 @@ class _PartnerMobileDashboardPageState
             ],
             _FinanceHeroCard(
               availableBalance: _availableBalance,
-              pendingAmount: _pendingAmount,
+              pendingAmount: _pendingPayoutAmount,
               onTapDetails: () => context.push('/partner/revenue-detail'),
             ),
             const SizedBox(height: 16),
@@ -178,7 +222,7 @@ class _PartnerMobileDashboardPageState
                   child: _CompactStatCard(
                     icon: Icons.payments_outlined,
                     label: 'Revenu total',
-                    value: _formatCfa(_revenue),
+                    value: _formatCfa(_grossRevenue),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -397,7 +441,9 @@ class PartnerPayoutsPage extends StatelessWidget {
               const SizedBox(height: 16),
               _PayoutBalanceCard(
                 amount: _formatCfa(finance.availableBalance),
-                onTap: () => context.push('/partner/payment-coordinates'),
+                onTap: () {
+                  _requestPartnerPayout(context, finance, reload);
+                },
               ),
               const SizedBox(height: 22),
               Text('Derniers versements', style: _label),
@@ -406,7 +452,7 @@ class PartnerPayoutsPage extends StatelessWidget {
                 Text('Aucun versement disponible', style: _sub)
               else
                 for (final payout in finance.payouts)
-                  _PayoutRow(payout.date, payout.formattedAmount),
+                  _PayoutRow(payout.date, payout.formattedAbsoluteAmount),
               const Spacer(),
               _LightButton(
                 'Voir l’historique',
@@ -418,8 +464,113 @@ class PartnerPayoutsPage extends StatelessWidget {
   );
 }
 
-class PartnerPaymentCoordinatesPage extends StatelessWidget {
+class PartnerPaymentCoordinatesPage extends StatefulWidget {
   const PartnerPaymentCoordinatesPage({super.key});
+
+  @override
+  State<PartnerPaymentCoordinatesPage> createState() =>
+      _PartnerPaymentCoordinatesPageState();
+}
+
+class _PartnerPaymentCoordinatesPageState
+    extends State<PartnerPaymentCoordinatesPage> {
+  final PartnerApiService _partnerApiService = PartnerApiService();
+  var _isLoading = true;
+  String? _loadError;
+  List<Map<String, dynamic>> _paymentMethods = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPaymentMethods();
+  }
+
+  Future<void> _loadPaymentMethods() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final methods = await _partnerApiService.getPartnerPaymentMethods();
+      if (!mounted) return;
+      setState(() {
+        _paymentMethods = methods;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _paymentMethods = const [];
+        _loadError = 'Coordonnées de paiement indisponibles.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<bool> _addPaymentMethod({
+    required String type,
+    required String label,
+    required String provider,
+    required String accountHolder,
+    required String maskedReference,
+  }) async {
+    try {
+      await _partnerApiService.createPartnerPaymentMethod({
+        'type': type,
+        'label': label,
+        'provider': provider,
+        'accountHolder': accountHolder,
+        'maskedReference': maskedReference,
+      });
+      if (!mounted) return false;
+      _showPartnerSnack(context, 'Moyen de versement ajouté.');
+      await _loadPaymentMethods();
+      return true;
+    } catch (_) {
+      if (mounted) {
+        _showPartnerSnack(context, 'Ajout du moyen de versement impossible.');
+      }
+      return false;
+    }
+  }
+
+  Future<void> _showPaymentMethodSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder:
+          (sheetContext) => _PaymentMethodSheet(
+            onSubmit:
+                (draft) => _addPaymentMethod(
+                  type: draft.type,
+                  label: draft.label,
+                  provider: draft.provider,
+                  accountHolder: draft.accountHolder,
+                  maskedReference: draft.maskedReference,
+                ),
+          ),
+    );
+  }
+
+  Future<void> _deletePaymentMethod(Map<String, dynamic> method) async {
+    final methodId = method['id']?.toString();
+    if (methodId == null || methodId.isEmpty) return;
+    try {
+      await _partnerApiService.deletePartnerPaymentMethod(methodId);
+      if (!mounted) return;
+      _showPartnerSnack(context, 'Moyen de versement désactivé.');
+      await _loadPaymentMethods();
+    } catch (_) {
+      if (mounted) {
+        _showPartnerSnack(context, 'Désactivation impossible.');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _PartnerShell(
@@ -427,39 +578,68 @@ class PartnerPaymentCoordinatesPage extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Ajouter un moyen de paiement', style: _headline),
-        const SizedBox(height: 18),
-        _PaymentCoordinateTile(
-          icon: Icons.phone_android_outlined,
-          title: 'Mobile Money',
-          subtitle: 'Orange, Wave, Free Money...',
-          onTap:
-              () => _showPartnerSnack(
-                context,
-                'Configuration Mobile Money prête à raccorder.',
-              ),
+        if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+        if (_isLoading) const SizedBox(height: 14),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadPaymentMethods,
+            color: AppColors.blueBic,
+            child: ListView(
+              padding: EdgeInsets.zero,
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                if (_loadError != null) ...[
+                  _PartnerNotice(
+                    message: _loadError!,
+                    onRetry: _loadPaymentMethods,
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                Text('Moyens de versement', style: _headline),
+                const SizedBox(height: 8),
+                Text(
+                  'Ajoutez uniquement des references masquees. Les numeros complets ne sont pas acceptes.',
+                  style: _sub,
+                ),
+                const SizedBox(height: 18),
+                if (!_isLoading && _paymentMethods.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6FAFA),
+                      border: Border.all(color: const Color(0xFFE1E8E6)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      'Aucun moyen de versement enregistre.',
+                      style: _row,
+                    ),
+                  )
+                else
+                  for (final method in _paymentMethods)
+                    _PaymentCoordinateTile(
+                      icon: _paymentMethodIcon(method['type']?.toString()),
+                      title: _paymentMethodTitle(method),
+                      subtitle: _paymentMethodSubtitle(method),
+                      trailingIcon: Icons.delete_outline,
+                      onTap: () => _deletePaymentMethod(method),
+                    ),
+                const SizedBox(height: 8),
+                Text('Ajouter', style: _label),
+                const SizedBox(height: 12),
+                _PaymentCoordinateTile(
+                  icon: Icons.add_card_outlined,
+                  title: 'Ajouter un moyen de versement',
+                  subtitle: 'Mobile Money, banque ou point de retrait',
+                  onTap: _showPaymentMethodSheet,
+                ),
+              ],
+            ),
+          ),
         ),
-        _PaymentCoordinateTile(
-          icon: Icons.account_balance_outlined,
-          title: 'Compte bancaire',
-          subtitle: 'IBAN, banque et titulaire',
-          onTap:
-              () => _showPartnerSnack(
-                context,
-                'Configuration bancaire prête à raccorder.',
-              ),
-        ),
-        _PaymentCoordinateTile(
-          icon: Icons.storefront_outlined,
-          title: 'Espèces',
-          subtitle: 'Point de retrait partenaire',
-          onTap:
-              () => _showPartnerSnack(
-                context,
-                'Retrait en espèces marqué comme option disponible.',
-              ),
-        ),
-        const Spacer(),
+        const SizedBox(height: 14),
         _Button(
           label: 'Factures / relevés',
           onTap: () => context.push('/partner/invoices'),
@@ -467,6 +647,36 @@ class PartnerPaymentCoordinatesPage extends StatelessWidget {
       ],
     ),
   );
+}
+
+IconData _paymentMethodIcon(String? type) {
+  return switch (type) {
+    'mobile_money' => Icons.phone_android_outlined,
+    'bank_account' => Icons.account_balance_outlined,
+    'cash_pickup' => Icons.storefront_outlined,
+    _ => Icons.account_balance_wallet_outlined,
+  };
+}
+
+String _paymentMethodTitle(Map<String, dynamic> method) {
+  final label = method['label']?.toString().trim();
+  if (label != null && label.isNotEmpty) return label;
+  return switch (method['type']?.toString()) {
+    'mobile_money' => 'Mobile Money',
+    'bank_account' => 'Compte bancaire',
+    'cash_pickup' => 'Point de retrait',
+    _ => 'Moyen de versement',
+  };
+}
+
+String _paymentMethodSubtitle(Map<String, dynamic> method) {
+  final maskedReference = method['maskedReference']?.toString().trim();
+  if (maskedReference != null && maskedReference.isNotEmpty) {
+    return maskedReference;
+  }
+  final provider = method['provider']?.toString().trim();
+  if (provider != null && provider.isNotEmpty) return provider;
+  return 'Actif';
 }
 
 class PartnerInvoicesPage extends StatelessWidget {
@@ -484,7 +694,11 @@ class PartnerInvoicesPage extends StatelessWidget {
               const SizedBox(height: 16),
               _PeriodPicker(label: 'Période', value: finance.currentPeriod),
               const SizedBox(height: 12),
-              for (final invoice in finance.invoices) _InvoiceRow(invoice),
+              if (finance.invoices.isEmpty)
+                Text('Aucun relevé disponible pour le moment.', style: _sub)
+              else
+                for (final invoice in finance.invoices)
+                  _InvoiceRow(invoice, storeId: finance.storeId),
               const SizedBox(height: 24),
               Text('Vos factures sont générées chaque mois.', style: _muted),
             ],
@@ -529,6 +743,14 @@ class _PartnerFinanceLoaderState extends State<_PartnerFinanceLoader> {
     builder: (context, snapshot) {
       final finance = snapshot.data;
       if (finance == null) {
+        if (snapshot.hasError) {
+          return Center(
+            child: _PartnerNotice(
+              message: 'Finances vendeur indisponibles.',
+              onRetry: _reload,
+            ),
+          );
+        }
         return const Center(
           child: CircularProgressIndicator(color: AppColors.blueBic),
         );
@@ -542,16 +764,30 @@ Future<_PartnerFinanceSnapshot> _loadPartnerFinance(
   PartnerApiService partnerApiService,
 ) async {
   try {
+    final storeContext = await _resolvePartnerStoreContext(
+      partnerApiService,
+      'store_yoff',
+    );
     final results = await Future.wait<Object>([
-      partnerApiService.getStoreReservations('store_yoff'),
-      partnerApiService.getStorePickups('store_yoff'),
+      partnerApiService.getStoreFinanceSummary(storeContext.storeId),
+      partnerApiService.getStoreFinanceTransactions(
+        storeContext.storeId,
+        limit: 100,
+      ),
+      partnerApiService.getStorePayoutRequests(storeContext.storeId),
+      partnerApiService.getStoreFinanceStatements(storeContext.storeId),
     ]);
     return _PartnerFinanceSnapshot(
-      orders: (results[0] as List<Map<String, dynamic>>),
-      pickups: (results[1] as List<Map<String, dynamic>>),
+      storeId: storeContext.storeId,
+      summary: results[0] as Map<String, dynamic>,
+      apiTransactions: results[1] as List<Map<String, dynamic>>,
+      apiPayouts: results[2] as List<Map<String, dynamic>>,
+      apiStatements: results[3] as List<Map<String, dynamic>>,
     );
   } catch (_) {
+    if (!ApiEnvironment.isDemoFallbackAllowed) rethrow;
     return const _PartnerFinanceSnapshot(
+      storeId: 'store_yoff',
       orders: _fallbackPartnerOrders,
       pickups: _fallbackPartnerPickups,
       isDemoMode: true,
@@ -559,20 +795,59 @@ Future<_PartnerFinanceSnapshot> _loadPartnerFinance(
   }
 }
 
+Future<PartnerStoreContext> _resolvePartnerStoreContext(
+  PartnerApiService partnerApiService,
+  String fallbackStoreId,
+) async {
+  final storeContext = await partnerApiService.getMyStoreContext();
+  if (storeContext != null) return storeContext;
+  if (ApiEnvironment.isDemoFallbackAllowed) {
+    return PartnerStoreContext(
+      storeId: fallbackStoreId,
+      storeName: 'Poissonnerie Yoff',
+      latitude: 14.7458,
+      longitude: -17.4572,
+    );
+  }
+  throw const PartnerApiException(
+    statusCode: 404,
+    message: 'partner_profile_missing',
+  );
+}
+
 class _PartnerFinanceSnapshot {
   const _PartnerFinanceSnapshot({
-    required this.orders,
-    required this.pickups,
+    required this.storeId,
+    this.summary = const {},
+    this.apiTransactions = const [],
+    this.apiPayouts = const [],
+    this.apiStatements = const [],
+    this.orders = const [],
+    this.pickups = const [],
     this.isDemoMode = false,
   });
 
+  final String storeId;
+  final Map<String, dynamic> summary;
+  final List<Map<String, dynamic>> apiTransactions;
+  final List<Map<String, dynamic>> apiPayouts;
+  final List<Map<String, dynamic>> apiStatements;
   final List<Map<String, dynamic>> orders;
   final List<Map<String, dynamic>> pickups;
   final bool isDemoMode;
 
-  int get grossRevenue => orders
-      .where((order) => !_isCanceledOrder(order))
-      .fold<int>(0, (total, order) => total + _intValue(order['amount']));
+  bool get hasApiFinance => summary.isNotEmpty;
+
+  int? _summaryInt(String key) {
+    if (!summary.containsKey(key)) return null;
+    return _intValue(summary[key]);
+  }
+
+  int get grossRevenue =>
+      _summaryInt('grossRevenue') ??
+      orders
+          .where((order) => !_isCanceledOrder(order))
+          .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
   int get settledRevenue {
     final orderRevenue = orders
@@ -590,18 +865,25 @@ class _PartnerFinanceSnapshot {
       .where(_isOpenOrder)
       .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
-  int get commission => (grossRevenue * .10).round();
+  int get commission =>
+      _summaryInt('commissionAmount') ?? (grossRevenue * .10).round();
 
-  int get refunds => orders
-      .where(_isCanceledOrder)
-      .fold<int>(0, (total, order) => total + _intValue(order['amount']));
+  int get refunds =>
+      _summaryInt('refundsAmount') ??
+      orders
+          .where(_isCanceledOrder)
+          .fold<int>(0, (total, order) => total + _intValue(order['amount']));
 
   int get netRevenue {
+    final apiNet = _summaryInt('netRevenue');
+    if (apiNet != null) return apiNet;
     final value = grossRevenue - commission - refunds;
     return value < 0 ? 0 : value;
   }
 
   int get availableBalance {
+    final apiBalance = _summaryInt('availableBalance');
+    if (apiBalance != null) return apiBalance;
     final settledCommission = (settledRevenue * .10).round();
     final value = settledRevenue - settledCommission - refunds;
     return value < 0 ? 0 : value;
@@ -610,6 +892,12 @@ class _PartnerFinanceSnapshot {
   String get currentPeriod => _formatMonthYear(DateTime.now());
 
   List<_FinanceMovement> get transactions {
+    if (hasApiFinance) {
+      final movements = apiTransactions.map(_financeMovementFromApi).toList();
+      movements.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+      return movements;
+    }
+
     final movements = <_FinanceMovement>[];
     for (final order in orders) {
       final amount = _intValue(order['amount']);
@@ -632,6 +920,12 @@ class _PartnerFinanceSnapshot {
   }
 
   List<_FinanceMovement> get payouts {
+    if (hasApiFinance) {
+      final movements = apiPayouts.map(_payoutMovementFromApi).toList();
+      movements.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+      return movements;
+    }
+
     return pickups.take(3).map((pickup) {
       return _FinanceMovement(
         title: 'Versement ${_pickupHistoryCode(pickup)}',
@@ -641,11 +935,23 @@ class _PartnerFinanceSnapshot {
     }).toList();
   }
 
-  List<String> get invoices {
+  List<_FinanceStatement> get invoices {
+    if (hasApiFinance) {
+      final statements = apiStatements.map(_financeStatementFromApi).toList();
+      statements.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+      return statements;
+    }
+
     final now = DateTime.now();
     return List.generate(3, (index) {
       final date = DateTime(now.year, now.month - index, 1);
-      return 'Relevé ${_formatMonthYear(date)}';
+      return _FinanceStatement(
+        period: '${date.year}-${date.month.toString().padLeft(2, '0')}',
+        title: 'Relevé ${_formatMonthYear(date)}',
+        subtitle: 'Généré localement',
+        amount: netRevenue,
+        sortKeyValue: date.toIso8601String(),
+      );
     });
   }
 }
@@ -670,7 +976,271 @@ class _FinanceMovement {
     return '$prefix${_formatCfa(amount.abs())}';
   }
 
+  String get formattedAbsoluteAmount => _formatCfa(amount.abs());
+
   String get sortKey => sortKeyValue ?? date;
+}
+
+class _FinanceStatement {
+  const _FinanceStatement({
+    required this.period,
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    this.sortKeyValue,
+  });
+
+  final String period;
+  final String title;
+  final String subtitle;
+  final int amount;
+  final String? sortKeyValue;
+
+  String get formattedAmount => _formatCfa(amount);
+  String get sortKey => sortKeyValue ?? title;
+}
+
+_FinanceMovement _financeMovementFromApi(Map<String, dynamic> transaction) {
+  final type = '${transaction['type'] ?? ''}'.toLowerCase().trim();
+  final amount = _intValue(transaction['amount']);
+  final createdAt = transaction['createdAt'] ?? transaction['created_at'];
+  final entityId =
+      transaction['orderId'] ??
+      transaction['order_id'] ??
+      transaction['payoutRequestId'] ??
+      transaction['payout_request_id'] ??
+      transaction['id'];
+
+  return _FinanceMovement(
+    title: switch (type) {
+      'refund' => 'Remboursement ${_cleanFinanceId(entityId)}',
+      'payout' => 'Versement ${_cleanFinanceId(entityId)}',
+      _ => 'Commande ${_cleanFinanceId(entityId)}',
+    },
+    date: _formatFinanceDate(createdAt),
+    sortKeyValue: createdAt?.toString(),
+    amount: amount,
+  );
+}
+
+_FinanceStatement _financeStatementFromApi(Map<String, dynamic> statement) {
+  final periodStart =
+      _dateTimeValue(statement['periodStart'] ?? statement['period_start']) ??
+      _periodDateValue(statement['period']);
+  final title =
+      periodStart == null
+          ? 'Relevé ${statement['period'] ?? ''}'.trim()
+          : 'Relevé ${_formatMonthYear(periodStart)}';
+  final netRevenue = _intValue(statement['netRevenue']);
+  final grossRevenue = _intValue(statement['grossRevenue']);
+  final commissionAmount = _intValue(statement['commissionAmount']);
+  final refundsAmount = _intValue(statement['refundsAmount']);
+
+  return _FinanceStatement(
+    period: statement['period']?.toString() ?? '',
+    title: title,
+    subtitle:
+        'Brut ${_formatCfa(grossRevenue)} • Commission ${_formatCfa(commissionAmount)}'
+        '${refundsAmount > 0 ? ' • Remb. ${_formatCfa(refundsAmount)}' : ''}',
+    amount: netRevenue,
+    sortKeyValue:
+        statement['periodStart']?.toString() ??
+        statement['period_start']?.toString() ??
+        statement['period']?.toString(),
+  );
+}
+
+_FinanceMovement _payoutMovementFromApi(Map<String, dynamic> payout) {
+  final status = '${payout['status'] ?? ''}'.toLowerCase().trim();
+  final date =
+      payout['processedAt'] ??
+      payout['processed_at'] ??
+      payout['reviewedAt'] ??
+      payout['reviewed_at'] ??
+      payout['requestedAt'] ??
+      payout['requested_at'] ??
+      payout['createdAt'] ??
+      payout['created_at'];
+
+  return _FinanceMovement(
+    title: _payoutStatusLabel(status),
+    date: '${_payoutStatusLabel(status)} • ${_formatFinanceDate(date)}',
+    sortKeyValue: date?.toString(),
+    amount: _intValue(payout['amount']),
+  );
+}
+
+String _cleanFinanceId(Object? value) {
+  final raw = '${value ?? ''}'.trim();
+  if (raw.isEmpty) return '';
+  return raw.startsWith('#') ? raw : '#$raw';
+}
+
+String _formatFinanceDate(Object? value) {
+  final parsed = _dateTimeValue(value);
+  if (parsed == null) return 'Date à confirmer';
+  final local = parsed.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/'
+      '${local.month.toString().padLeft(2, '0')}/'
+      '${local.year}';
+}
+
+String _payoutStatusLabel(String status) {
+  return switch (status) {
+    'pending_review' => 'En attente',
+    'approved' => 'Approuvé',
+    'paid' => 'Payé',
+    'rejected' => 'Refusé',
+    'canceled' => 'Annulé',
+    _ => 'Versement',
+  };
+}
+
+Future<void> _requestPartnerPayout(
+  BuildContext context,
+  _PartnerFinanceSnapshot finance,
+  VoidCallback reload,
+) async {
+  if (finance.isDemoMode) {
+    _showPartnerSnack(
+      context,
+      'Versement disponible avec le backend connecté.',
+    );
+    return;
+  }
+
+  final amount = finance.availableBalance;
+  if (amount < 100) {
+    _showPartnerSnack(context, 'Solde insuffisant pour demander un versement.');
+    return;
+  }
+
+  final partnerApiService = PartnerApiService();
+  try {
+    final storeContext = await _resolvePartnerStoreContext(
+      partnerApiService,
+      'store_yoff',
+    );
+    final paymentMethods = await partnerApiService.getPartnerPaymentMethods();
+    if (!context.mounted) return;
+    if (paymentMethods.isEmpty) {
+      _showPartnerSnack(context, 'Ajoutez un moyen de versement d’abord.');
+      context.push('/partner/payment-coordinates');
+      return;
+    }
+
+    final paymentMethod = await _selectPayoutPaymentMethod(
+      context,
+      amount: amount,
+      paymentMethods: paymentMethods,
+    );
+    if (!context.mounted || paymentMethod == null) return;
+
+    final paymentMethodId = '${paymentMethod['id'] ?? ''}'.trim();
+    if (paymentMethodId.isEmpty) {
+      _showPartnerSnack(context, 'Moyen de versement invalide.');
+      return;
+    }
+
+    await partnerApiService.createPartnerPayoutRequest(
+      storeId: storeContext.storeId,
+      paymentMethodId: paymentMethodId,
+      amount: amount,
+      currency: 'xof',
+    );
+    if (!context.mounted) return;
+    _showPartnerSnack(context, 'Demande de versement envoyée.');
+    reload();
+  } catch (error) {
+    if (!context.mounted) return;
+    _showPartnerSnack(
+      context,
+      ApiErrorMessages.fromObject(
+        error,
+        fallback: 'Demande de versement impossible.',
+      ),
+    );
+  }
+}
+
+Future<Map<String, dynamic>?> _selectPayoutPaymentMethod(
+  BuildContext context, {
+  required int amount,
+  required List<Map<String, dynamic>> paymentMethods,
+}) {
+  return showModalBottomSheet<Map<String, dynamic>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder:
+        (sheetContext) => _PayoutPaymentMethodSheet(
+          amount: amount,
+          paymentMethods: paymentMethods,
+        ),
+  );
+}
+
+Future<void> _openStatementPdf(
+  BuildContext context,
+  String storeId,
+  String period,
+) async {
+  if (period.isEmpty) {
+    _showPartnerSnack(context, 'Période de relevé invalide.');
+    return;
+  }
+
+  try {
+    final download = await PartnerApiService()
+        .createStoreFinanceStatementDownloadIntent(storeId, period);
+    if (!context.mounted) return;
+    final rawUrl = download['downloadUrl']?.toString() ?? '';
+    if (DemoMode.enabled) {
+      final contents =
+          Uri.parse(rawUrl).data?.contentAsString() ??
+          'Releve de demonstration';
+      await showDialog<void>(
+        context: context,
+        builder:
+            (dialogContext) => AlertDialog(
+              title: const Text('Releve simule'),
+              content: Text(contents),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Fermer'),
+                ),
+              ],
+            ),
+      );
+      return;
+    }
+    if (rawUrl.isEmpty) {
+      _showPartnerSnack(context, 'Lien de relevé indisponible.');
+      return;
+    }
+
+    final launched = await launchUrl(
+      _backendUri(rawUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!context.mounted) return;
+    if (!launched) {
+      _showPartnerSnack(context, 'Ouverture du relevé impossible.');
+    }
+  } catch (_) {
+    if (!context.mounted) return;
+    _showPartnerSnack(context, 'Téléchargement du relevé impossible.');
+  }
+}
+
+Uri _backendUri(String pathOrUrl) {
+  final uri = Uri.parse(pathOrUrl);
+  if (uri.hasScheme) return uri;
+  return Uri.parse(ApiEnvironment.baseUrl).resolve(pathOrUrl);
 }
 
 class _SellerHeader extends StatelessWidget {
@@ -1110,6 +1680,182 @@ class _PayoutBalanceCard extends StatelessWidget {
   );
 }
 
+class _PayoutPaymentMethodSheet extends StatefulWidget {
+  const _PayoutPaymentMethodSheet({
+    required this.amount,
+    required this.paymentMethods,
+  });
+
+  final int amount;
+  final List<Map<String, dynamic>> paymentMethods;
+
+  @override
+  State<_PayoutPaymentMethodSheet> createState() =>
+      _PayoutPaymentMethodSheetState();
+}
+
+class _PayoutPaymentMethodSheetState extends State<_PayoutPaymentMethodSheet> {
+  var _selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * .78;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(22, 16, 22, bottomInset + 18),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD7E1E0),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Demander un versement', style: _headline),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: AppColors.blueBic),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.blueBic,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Montant à verser',
+                      style: _muted.copyWith(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(_formatCfa(widget.amount), style: _whiteTitle),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('Destination', style: _label),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: widget.paymentMethods.length,
+                  itemBuilder: (context, index) {
+                    final method = widget.paymentMethods[index];
+                    return _PayoutPaymentOptionTile(
+                      method: method,
+                      selected: index == _selectedIndex,
+                      onTap: () => setState(() => _selectedIndex = index),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Button(
+                label: 'Confirmer le versement',
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).pop(widget.paymentMethods[_selectedIndex]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PayoutPaymentOptionTile extends StatelessWidget {
+  const _PayoutPaymentOptionTile({
+    required this.method,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> method;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: Container(
+      height: 72,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFE7F4F3) : Colors.white,
+        border: Border.all(
+          color: selected ? AppColors.blueBic : const Color(0xFFE1E8E6),
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.blueBic : const Color(0xFFEAF2F1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _paymentMethodIcon(method['type']?.toString()),
+              color: selected ? Colors.white : AppColors.blueBic,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_paymentMethodTitle(method), style: _title),
+                Text(
+                  _paymentMethodSubtitle(method),
+                  style: _muted,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            selected
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            color: selected ? AppColors.blueBic : const Color(0xFF789094),
+            size: 20,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _PayoutRow extends StatelessWidget {
   const _PayoutRow(this.date, this.amount);
 
@@ -1137,18 +1883,367 @@ class _PayoutRow extends StatelessWidget {
   );
 }
 
+class _PaymentMethodDraft {
+  const _PaymentMethodDraft({
+    required this.type,
+    required this.label,
+    required this.provider,
+    required this.accountHolder,
+    required this.maskedReference,
+  });
+
+  final String type;
+  final String label;
+  final String provider;
+  final String accountHolder;
+  final String maskedReference;
+}
+
+class _PaymentMethodSheet extends StatefulWidget {
+  const _PaymentMethodSheet({required this.onSubmit});
+
+  final Future<bool> Function(_PaymentMethodDraft draft) onSubmit;
+
+  @override
+  State<_PaymentMethodSheet> createState() => _PaymentMethodSheetState();
+}
+
+class _PaymentMethodSheetState extends State<_PaymentMethodSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _labelController = TextEditingController();
+  final _providerController = TextEditingController();
+  final _accountHolderController = TextEditingController();
+  final _referenceController = TextEditingController();
+  var _type = 'mobile_money';
+  var _isSaving = false;
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _providerController.dispose();
+    _accountHolderController.dispose();
+    _referenceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    if (_formKey.currentState?.validate() != true) return;
+
+    setState(() => _isSaving = true);
+    final saved = await widget.onSubmit(
+      _PaymentMethodDraft(
+        type: _type,
+        label: _labelController.text.trim(),
+        provider: _providerController.text.trim(),
+        accountHolder: _accountHolderController.text.trim(),
+        maskedReference: _referenceController.text.trim(),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    if (saved) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(22, 16, 22, bottomInset + 18),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD7E1E0),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Ajouter un moyen de versement',
+                        style: _headline,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          _isSaving ? null : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: AppColors.blueBic),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Les references doivent etre masquees avant envoi.',
+                  style: _sub,
+                ),
+                const SizedBox(height: 18),
+                Text('Type', style: _label),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _PaymentTypeChip(
+                        label: 'Mobile',
+                        icon: Icons.phone_android_outlined,
+                        selected: _type == 'mobile_money',
+                        onTap: () => setState(() => _type = 'mobile_money'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _PaymentTypeChip(
+                        label: 'Banque',
+                        icon: Icons.account_balance_outlined,
+                        selected: _type == 'bank_account',
+                        onTap: () => setState(() => _type = 'bank_account'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _PaymentTypeChip(
+                        label: 'Especes',
+                        icon: Icons.storefront_outlined,
+                        selected: _type == 'cash_pickup',
+                        onTap: () => setState(() => _type = 'cash_pickup'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _PaymentFormField(
+                  label: 'Libelle',
+                  controller: _labelController,
+                  hintText: _labelHint,
+                  validator: _requiredText,
+                ),
+                _PaymentFormField(
+                  label: 'Fournisseur',
+                  controller: _providerController,
+                  hintText: _providerHint,
+                ),
+                _PaymentFormField(
+                  label: 'Titulaire',
+                  controller: _accountHolderController,
+                  hintText: 'Nom du titulaire ou du responsable',
+                  validator: _requiredText,
+                ),
+                _PaymentFormField(
+                  label: 'Reference masquee',
+                  controller: _referenceController,
+                  hintText: _referenceHint,
+                  validator: _validateMaskedReference,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Exemples valides : +22177***4567, ****1042.',
+                  style: _muted,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: _isSaving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.blueBic,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child:
+                        _isSaving
+                            ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : Text('Enregistrer', style: _button),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String get _labelHint {
+    return switch (_type) {
+      'bank_account' => 'Compte bancaire principal',
+      'cash_pickup' => 'Point de retrait partenaire',
+      _ => 'Wave versement',
+    };
+  }
+
+  String get _providerHint {
+    return switch (_type) {
+      'bank_account' => 'Banque',
+      'cash_pickup' => 'Cash',
+      _ => 'Wave, Orange Money, Free Money...',
+    };
+  }
+
+  String get _referenceHint {
+    return switch (_type) {
+      'bank_account' => '****1042',
+      'cash_pickup' => 'Dakar',
+      _ => '+22177***4567',
+    };
+  }
+
+  String? _requiredText(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.length < 3) return 'Champ requis';
+    return null;
+  }
+
+  String? _validateMaskedReference(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.length < 2) return 'Reference requise';
+    if (_hasUnsafePaymentReference(trimmed)) {
+      return 'Masquez la reference avant envoi';
+    }
+    return null;
+  }
+}
+
+class _PaymentTypeChip extends StatelessWidget {
+  const _PaymentTypeChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      height: 50,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFE7F4F3) : Colors.white,
+        border: Border.all(
+          color: selected ? AppColors.blueBic : const Color(0xFFE1E8E6),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 16, color: AppColors.blueBic),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: selected ? _greenSmall : _label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PaymentFormField extends StatelessWidget {
+  const _PaymentFormField({
+    required this.label,
+    required this.controller,
+    required this.hintText,
+    this.validator,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String hintText;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: _label),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          style: _row,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: _muted,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFE1E8E6)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.blueBic),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFE45B5B)),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFE45B5B)),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+bool _hasUnsafePaymentReference(String value) {
+  return RegExp(r'\d{7,}').hasMatch(value.replaceAll(RegExp(r'\s+'), ''));
+}
+
 class _PaymentCoordinateTile extends StatelessWidget {
   const _PaymentCoordinateTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.trailingIcon = Icons.chevron_right_rounded,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final IconData trailingIcon;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -1185,7 +2280,7 @@ class _PaymentCoordinateTile extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF789094)),
+          Icon(trailingIcon, color: const Color(0xFF789094)),
         ],
       ),
     ),
@@ -1193,20 +2288,17 @@ class _PaymentCoordinateTile extends StatelessWidget {
 }
 
 class _InvoiceRow extends StatelessWidget {
-  const _InvoiceRow(this.title);
+  const _InvoiceRow(this.statement, {required this.storeId});
 
-  final String title;
+  final _FinanceStatement statement;
+  final String storeId;
 
   @override
   Widget build(BuildContext context) => InkWell(
-    onTap:
-        () => _showPartnerSnack(
-          context,
-          'Téléchargement du relevé à raccorder au module PDF.',
-        ),
+    onTap: () => _openStatementPdf(context, storeId, statement.period),
     borderRadius: BorderRadius.circular(12),
     child: Container(
-      height: 54,
+      height: 64,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -1215,8 +2307,23 @@ class _InvoiceRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: _row)),
-          Text('Télécharger (PDF)', style: _green),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(statement.title, style: _row),
+                const SizedBox(height: 2),
+                Text(
+                  statement.subtitle,
+                  style: _muted,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Text(statement.formattedAmount, style: _green),
         ],
       ),
     ),
@@ -1306,7 +2413,13 @@ class _PartnerBasketsPageState extends State<PartnerBasketsPage> {
     });
 
     try {
-      final offers = await _partnerApiService.getStoreOffers(_storeId);
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        _storeId,
+      );
+      final offers = await _partnerApiService.getStoreOffers(
+        storeContext.storeId,
+      );
       if (!mounted) return;
       setState(() {
         _offers = offers;
@@ -1315,8 +2428,14 @@ class _PartnerBasketsPageState extends State<PartnerBasketsPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _offers = _fallbackPartnerOffers;
-        _loadError = null;
+        _offers =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerOffers
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Paniers vendeur indisponibles.';
         _isLoading = false;
       });
     }
@@ -1529,6 +2648,12 @@ String _formatMonthYear(DateTime date) {
   return '${months[date.month - 1]} ${date.year}';
 }
 
+DateTime? _periodDateValue(Object? value) {
+  final raw = '${value ?? ''}'.trim();
+  if (!RegExp(r'^\d{4}-\d{2}$').hasMatch(raw)) return null;
+  return DateTime.tryParse('$raw-01T00:00:00.000Z');
+}
+
 DateTime? _dateTimeValue(Object? value) {
   if (value is DateTime) return value;
   if (value == null) return null;
@@ -1719,7 +2844,7 @@ class _PartnerBasketEditPageState extends State<PartnerBasketEditPage> {
       });
       if (!mounted) return;
       if (context.canPop()) {
-        context.pop(updated);
+        safePop(context, updated);
       } else {
         context.go('/partner/baskets');
       }
@@ -1846,8 +2971,12 @@ class _PartnerOrdersMobilePageState extends State<PartnerOrdersMobilePage> {
       _loadError = null;
     });
     try {
-      final reservations = await _partnerApiService.getStoreReservations(
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
         _storeId,
+      );
+      final reservations = await _partnerApiService.getStoreReservations(
+        storeContext.storeId,
       );
       if (!mounted) return;
       setState(() {
@@ -1857,8 +2986,14 @@ class _PartnerOrdersMobilePageState extends State<PartnerOrdersMobilePage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _orders = _fallbackPartnerOrders;
-        _loadError = null;
+        _orders =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerOrders
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Commandes vendeur indisponibles.';
         _isLoading = false;
       });
     }
@@ -2002,6 +3137,18 @@ String _clientName(Map<String, dynamic> order) {
   return '${order['clientName'] ?? order['user_id'] ?? 'Client'}';
 }
 
+String _clientUserId(Map<String, dynamic> order) {
+  return '${order['clientUserId'] ?? order['user_id'] ?? 'Client DailyCatch'}';
+}
+
+String _clientInitials(Map<String, dynamic> order) {
+  final name = _clientName(order).trim();
+  if (name.isEmpty || name == 'Client') return 'DC';
+  final parts = name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+  final initials = parts.take(2).map((part) => part[0]).join().toUpperCase();
+  return initials.isEmpty ? 'DC' : initials;
+}
+
 String _pickupSlot(Map<String, dynamic> order) {
   return '${order['pickupSlot'] ?? order['pickup_slot'] ?? 'Créneau à confirmer'}';
 }
@@ -2077,7 +3224,7 @@ class PartnerOrderDetailMobilePage extends StatelessWidget {
           const SizedBox(height: 12),
           _Button(
             label: 'Voir le profil client',
-            onTap: () => context.push('/partner/client-profile'),
+            onTap: () => context.push('/partner/client-profile', extra: order),
           ),
         ],
       ),
@@ -2306,8 +3453,14 @@ class _PartnerCommerceSettingsPageState
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _profile = _fallbackPartnerProfile;
-        _loadError = null;
+        _profile =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerProfile
+                : null;
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Profil commerce indisponible.';
         _isLoading = false;
       });
     }
@@ -2757,10 +3910,14 @@ class _PartnerRecurringSlotsPageState extends State<PartnerRecurringSlotsPage> {
     final secondSlotStart = DateTime(now.year, now.month, now.day, 19);
     final secondSlotEnd = DateTime(now.year, now.month, now.day, 21);
     try {
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        'store_yoff',
+      );
       await _partnerApiService.createOffer(
         PartnerOfferRequest(
-          storeId: 'store_yoff',
-          storeName: 'Poissonnerie Yoff',
+          storeId: storeContext.storeId,
+          storeName: storeContext.storeName,
           name: _PartnerBasketDraft.name,
           description: _PartnerBasketDraft.description,
           category: _PartnerBasketDraft.category,
@@ -2770,8 +3927,8 @@ class _PartnerRecurringSlotsPageState extends State<PartnerRecurringSlotsPage> {
           availableQuantity: _PartnerBasketDraft.availableQuantity,
           pickupStartsAt: firstSlotStart,
           pickupEndsAt: firstSlotEnd,
-          latitude: 14.7603,
-          longitude: -17.4732,
+          latitude: storeContext.latitude,
+          longitude: storeContext.longitude,
           mediaUrls: _PartnerBasketDraft.mediaUrls,
           pickupSlots: [
             {
@@ -3208,7 +4365,9 @@ class _PartnerValidationStatusPageState
 }
 
 class PartnerClientChatPage extends StatefulWidget {
-  const PartnerClientChatPage({super.key});
+  const PartnerClientChatPage({super.key, required this.order});
+
+  final Map<String, dynamic> order;
 
   @override
   State<PartnerClientChatPage> createState() => _PartnerClientChatPageState();
@@ -3265,14 +4424,17 @@ class _PartnerClientChatPageState extends State<PartnerClientChatPage> {
                       ),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
-                const CircleAvatar(radius: 19, child: Text('SD')),
+                CircleAvatar(
+                  radius: 19,
+                  child: Text(_clientInitials(widget.order)),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Sophie D.', style: _title),
-                      Text('Commande #DC-1254', style: _muted),
+                      Text(_clientName(widget.order), style: _title),
+                      Text('Commande ${_orderId(widget.order)}', style: _muted),
                     ],
                   ),
                 ),
@@ -3346,24 +4508,29 @@ class _PartnerClientMessage {
 }
 
 class PartnerClientProfilePage extends StatelessWidget {
-  const PartnerClientProfilePage({super.key});
+  const PartnerClientProfilePage({super.key, required this.order});
+
+  final Map<String, dynamic> order;
 
   @override
   Widget build(BuildContext context) => _PartnerShell(
     title: 'Détail client',
     child: Column(
       children: [
-        const CircleAvatar(radius: 42, child: Text('SD')),
+        CircleAvatar(radius: 42, child: Text(_clientInitials(order))),
         const SizedBox(height: 12),
-        Text('Sophie Diop', style: _headline),
+        Text(_clientName(order), style: _headline),
         _Badge('Client régulier'),
         const SizedBox(height: 26),
-        _Info('Téléphone', '+221 77 123 45 67'),
-        _Info('Email', 'sophie.diop@email.com'),
-        _Info('Membre depuis', '15 mars 2024'),
-        _Info('Commandes', '28 commandes'),
-        _Info('Total dépensé', '245 000 CFA'),
-        const _Field('Notes', 'Cliente fidèle, ponctuelle\net respectueuse.'),
+        _Info('Identifiant client', _clientUserId(order)),
+        _Info('Dernière commande', _orderId(order)),
+        _Info('Créneau', _pickupSlot(order)),
+        _Info('Dernier montant', _formatCfa(order['amount'])),
+        _Info('Statut', _statusLabel(order)),
+        const _Field(
+          'Notes',
+          'Historique synchronisé depuis les commandes vendeur.',
+        ),
         const Spacer(),
         _Button(
           label: 'Voir ses commandes',
@@ -3537,7 +4704,13 @@ class _PartnerValidatedPickupsPageState
     });
 
     try {
-      final pickups = await _partnerApiService.getStorePickups(_storeId);
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        _storeId,
+      );
+      final pickups = await _partnerApiService.getStorePickups(
+        storeContext.storeId,
+      );
       if (!mounted) return;
       setState(() {
         _pickups = pickups;
@@ -3546,8 +4719,14 @@ class _PartnerValidatedPickupsPageState
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _pickups = _fallbackPartnerPickups;
-        _loadError = null;
+        _pickups =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPartnerPickups
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Retraits validés indisponibles.';
         _isLoading = false;
       });
     }
@@ -3653,7 +4832,13 @@ class _PartnerPromotionsPageState extends State<PartnerPromotionsPage> {
     });
 
     try {
-      final promotions = await _partnerApiService.getStorePromotions(_storeId);
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        _storeId,
+      );
+      final promotions = await _partnerApiService.getStorePromotions(
+        storeContext.storeId,
+      );
       if (!mounted) return;
       setState(() {
         _promotions = promotions;
@@ -3662,8 +4847,14 @@ class _PartnerPromotionsPageState extends State<PartnerPromotionsPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _promotions = _fallbackPromotions;
-        _loadError = null;
+        _promotions =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackPromotions
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? null
+                : 'Promotions indisponibles.';
         _isLoading = false;
       });
     }
@@ -3908,8 +5099,12 @@ class _PartnerCreatePromotionPageState
     final startsAt = _parseDateInput(_startsAtController.text);
     final endsAt = _parseDateInput(_endsAtController.text, endOfDay: true);
     try {
+      final storeContext = await _resolvePartnerStoreContext(
+        _partnerApiService,
+        _storeId,
+      );
       await _partnerApiService.createPromotion({
-        'storeId': _storeId,
+        'storeId': storeContext.storeId,
         'title': _promotionTitle(value),
         'code': code,
         'type': _promotionType,
@@ -4008,7 +5203,7 @@ void _safePartnerBack(
   String fallback = '/partner/mobile-dashboard',
 }) {
   if (context.canPop()) {
-    context.pop();
+    safePop(context);
   } else {
     context.go(fallback);
   }

@@ -4,6 +4,7 @@ import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
 import 'package:myapp/providers/partner_provider.dart';
 import 'package:myapp/services/partner_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
 
 class PartnerInventoryPage extends StatefulWidget {
   const PartnerInventoryPage({super.key});
@@ -13,7 +14,7 @@ class PartnerInventoryPage extends StatefulWidget {
 }
 
 class _PartnerInventoryPageState extends State<PartnerInventoryPage> {
-  static const _storeId = 'store_port';
+  static const _fallbackStoreId = 'store_port';
   final PartnerApiService _partnerApiService = PartnerApiService();
   bool _isLoading = true;
   String? _loadError;
@@ -27,7 +28,8 @@ class _PartnerInventoryPageState extends State<PartnerInventoryPage> {
 
   Future<void> _loadInventory() async {
     try {
-      final offers = await _partnerApiService.getStoreOffers(_storeId);
+      final storeId = await _resolveStoreId();
+      final offers = await _partnerApiService.getStoreOffers(storeId);
       if (!mounted) return;
       setState(() {
         _apiProducts = offers.map(_productFromApi).toList();
@@ -38,17 +40,34 @@ class _PartnerInventoryPageState extends State<PartnerInventoryPage> {
       if (!mounted) return;
       setState(() {
         _apiProducts = null;
-        _loadError = 'Backend indisponible: stock de démonstration';
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Backend indisponible: stock de démonstration'
+                : 'Stock vendeur indisponible.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<String> _resolveStoreId() async {
+    final storeContext = await _partnerApiService.getMyStoreContext();
+    if (storeContext != null) return storeContext.storeId;
+    if (ApiEnvironment.isDemoFallbackAllowed) return _fallbackStoreId;
+    throw const PartnerApiException(
+      statusCode: 404,
+      message: 'partner_profile_missing',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<PartnerProvider>(
       builder: (context, provider, child) {
-        final products = _apiProducts ?? provider.products;
+        final products =
+            _apiProducts ??
+            (ApiEnvironment.isDemoFallbackAllowed
+                ? provider.products
+                : const <Product>[]);
         return Material(
           color: AppTheme.mutedSurface,
           child: Column(

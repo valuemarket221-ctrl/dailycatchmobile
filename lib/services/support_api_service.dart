@@ -2,8 +2,11 @@ import 'package:http/http.dart' as http;
 import 'package:myapp/services/backend_api_client.dart';
 
 class SupportApiService {
-  SupportApiService({http.Client? client, String? baseUrl})
-    : _api = BackendApiClient(client: client, baseUrl: baseUrl);
+  SupportApiService({
+    http.Client? client,
+    String? baseUrl,
+    BackendApiClient? api,
+  }) : _api = api ?? BackendApiClient(client: client, baseUrl: baseUrl);
 
   final BackendApiClient _api;
 
@@ -19,7 +22,7 @@ class SupportApiService {
       'subject': subject,
       'message': message,
     });
-    return body['ticketId'] as String;
+    return _parse(() => BackendApiClient.requireString(body, 'ticketId'));
   }
 
   Future<void> registerPushToken({
@@ -36,13 +39,15 @@ class SupportApiService {
     final body = await _patchJson('/api/v1/notifications/device-tokens/me', {
       'enabled': enabled,
     });
-    return body['updatedCount'] as int;
+    return _parse(() => BackendApiClient.requireInt(body, 'updatedCount'));
   }
 
   Future<NotificationPreferences> getNotificationPreferences() async {
     final body = await _getJson('/api/v1/notifications/preferences/me');
-    return NotificationPreferences.fromJson(
-      body['preferences'] as Map<String, dynamic>,
+    return _parse(
+      () => NotificationPreferences.fromJson(
+        BackendApiClient.requireObject(body, 'preferences'),
+      ),
     );
   }
 
@@ -58,8 +63,10 @@ class SupportApiService {
       'pickupRemindersEnabled': pickupRemindersEnabled,
       'newsEnabled': newsEnabled,
     });
-    return NotificationPreferences.fromJson(
-      body['preferences'] as Map<String, dynamic>,
+    return _parse(
+      () => NotificationPreferences.fromJson(
+        BackendApiClient.requireObject(body, 'preferences'),
+      ),
     );
   }
 
@@ -92,6 +99,19 @@ class SupportApiService {
       throw SupportApiException.fromBackend(error);
     }
   }
+
+  T _parse<T>(T Function() parser) {
+    try {
+      return parser();
+    } on BackendApiException catch (error) {
+      throw SupportApiException.fromBackend(error);
+    } catch (_) {
+      throw const SupportApiException(
+        statusCode: 200,
+        message: 'invalid_backend_response',
+      );
+    }
+  }
 }
 
 class NotificationPreferences {
@@ -109,10 +129,16 @@ class NotificationPreferences {
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
     return NotificationPreferences(
-      nearbyOffersEnabled: json['nearbyOffersEnabled'] as bool,
-      ordersEnabled: json['ordersEnabled'] as bool,
-      pickupRemindersEnabled: json['pickupRemindersEnabled'] as bool,
-      newsEnabled: json['newsEnabled'] as bool,
+      nearbyOffersEnabled: BackendApiClient.requireBool(
+        json,
+        'nearbyOffersEnabled',
+      ),
+      ordersEnabled: BackendApiClient.requireBool(json, 'ordersEnabled'),
+      pickupRemindersEnabled: BackendApiClient.requireBool(
+        json,
+        'pickupRemindersEnabled',
+      ),
+      newsEnabled: BackendApiClient.requireBool(json, 'newsEnabled'),
     );
   }
 }

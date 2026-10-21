@@ -18,32 +18,76 @@ service firebase.storage {
       return hasRole('partner');
     }
 
-    function isSafeImage() {
+    function ownsUserFolder(userId) {
+      return signedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    function ownsStore(storeId) {
+      return isAdmin()
+        || (
+          isPartner()
+          && (
+            request.auth.token.store_id == storeId
+            || request.auth.token.storeId == storeId
+            || (
+              request.auth.token.partner_store_ids is map
+              && request.auth.token.partner_store_ids[storeId] == true
+            )
+            || (
+              request.auth.token.partner_store_ids is list
+              && request.auth.token.partner_store_ids.hasAny([storeId])
+            )
+          )
+        );
+    }
+
+    function isSafeOfferImage() {
       return request.resource != null
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function isSafeDocument() {
+      return request.resource != null
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('(application/pdf|image/(jpeg|png))');
     }
 
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && isSafeImage();
+      allow write: if isAdmin() && isSafeOfferImage();
     }
 
     match /stores/{storeId}/{fileName} {
       allow read: if true;
-      allow write: if (isAdmin() || isPartner()) && isSafeImage();
+      allow write: if ownsStore(storeId) && isSafeOfferImage();
     }
 
     match /products/{storeId}/{fileName} {
       allow read: if true;
-      allow write: if (isAdmin() || isPartner()) && isSafeImage();
+      allow write: if ownsStore(storeId) && isSafeOfferImage();
+    }
+
+    match /offer-media/{ownerUserId}/{fileName} {
+      allow read: if true;
+      allow write: if ownsUserFolder(ownerUserId)
+        && (isAdmin() || isPartner())
+        && isSafeOfferImage();
+    }
+
+    match /partner-documents/{ownerUserId}/{fileName} {
+      allow read: if ownsUserFolder(ownerUserId);
+      allow write: if signedIn()
+        && request.auth.uid == ownerUserId
+        && isPartner()
+        && isSafeDocument();
     }
 
     match /users/{userId}/{fileName} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if ownsUserFolder(userId);
       allow write: if signedIn()
         && request.auth.uid == userId
-        && isSafeImage();
+        && isSafeOfferImage();
     }
 
     match /{allPaths=**} {

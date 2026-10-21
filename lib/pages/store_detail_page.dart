@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/providers/cart_provider.dart';
 import 'package:myapp/services/product_offer_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:provider/provider.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 
 class StoreDetailPage extends StatefulWidget {
   final String storeId;
@@ -182,8 +186,14 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   : '${first.distanceKm!.toStringAsFixed(1)} km',
           'rating': 4.6,
           'reviews': 0,
-          'image': _imageForOffer(first.name),
-          'banner': _imageForOffer(first.name),
+          'image':
+              first.mediaUrls.isNotEmpty
+                  ? first.mediaUrls.first
+                  : _imageForOffer(first.name),
+          'banner':
+              first.mediaUrls.isNotEmpty
+                  ? first.mediaUrls.first
+                  : _imageForOffer(first.name),
           'products': _fallbackProducts,
         };
       }
@@ -195,11 +205,14 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       final products =
           matchingOffers.map((offer) {
             final fallback = fallbackById[offer.id];
+            final image =
+                offer.mediaUrls.isNotEmpty
+                    ? offer.mediaUrls.first
+                    : fallback?['image'] as String? ??
+                        store['image'] as String? ??
+                        '';
             return offer.toProductMap(
-              image:
-                  fallback?['image'] as String? ??
-                  store['image'] as String? ??
-                  '',
+              image: image,
               description: fallback?['description'] as String? ?? '',
               originalPrice:
                   (fallback?['originalPrice'] as num?)?.toDouble() ??
@@ -208,8 +221,13 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             );
           }).toList();
 
-      return products.isEmpty ? _fallbackProducts : products;
-    } catch (_) {
+      if (products.isNotEmpty || !ApiEnvironment.isDemoFallbackAllowed) {
+        return products;
+      }
+      return _fallbackProducts;
+    } catch (error) {
+      if (!ApiEnvironment.isDemoFallbackAllowed) rethrow;
+      debugPrint(ApiErrorMessages.fromObject(error));
       return _fallbackProducts;
     }
   }
@@ -264,7 +282,25 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _productsFuture,
         builder: (context, snapshot) {
-          final products = snapshot.data ?? _fallbackProducts;
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.blueBic),
+            );
+          }
+          final products =
+              snapshot.data ??
+              (ApiEnvironment.isDemoFallbackAllowed
+                  ? _fallbackProducts
+                  : <Map<String, dynamic>>[]);
+          if (products.isEmpty) {
+            return _StoreUnavailableState(
+              message:
+                  snapshot.hasError
+                      ? ApiErrorMessages.fromObject(snapshot.error!)
+                      : 'Aucun panier disponible pour cette boutique.',
+              onRetry: () => setState(() => _productsFuture = _loadProducts()),
+            );
+          }
           final product = _normalizedDetailProduct(products.first);
 
           return Stack(
@@ -277,16 +313,15 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.asset(
-                            product['image'] as String? ??
-                                store['banner'] as String,
+                          AppRemoteImage(
+                            path:
+                                product['image'] as String? ??
+                                store['banner'] as String? ??
+                                '',
+                            width: MediaQuery.sizeOf(context).width,
+                            height: 282,
                             fit: BoxFit.cover,
                             filterQuality: FilterQuality.medium,
-                            errorBuilder:
-                                (c, e, s) => Container(
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.image_not_supported),
-                                ),
                           ),
                           Container(
                             decoration: BoxDecoration(
@@ -305,7 +340,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                             left: 16,
                             child: _CircleAction(
                               icon: Icons.arrow_back,
-                              onTap: () => context.pop(),
+                              onTap: () => safePop(context),
                             ),
                           ),
                           Positioned(
@@ -637,14 +672,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(
-                  product['image'] as String,
+                AppRemoteImage(
+                  path: product['image'] as String? ?? '',
+                  width: 112,
+                  height: 154,
                   fit: BoxFit.cover,
-                  errorBuilder:
-                      (c, e, s) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image_not_supported),
-                      ),
                 ),
                 Positioned(
                   left: 8,
@@ -807,6 +839,72 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       ),
     );
   }
+}
+
+class _StoreUnavailableState extends StatelessWidget {
+  const _StoreUnavailableState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _CircleAction(icon: Icons.arrow_back, onTap: () => safePop(context)),
+          ),
+          const Spacer(),
+          const Icon(
+            Icons.shopping_bag_outlined,
+            color: AppColors.blueBic,
+            size: 74,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Aucun panier disponible',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.blueBic,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: const Color(0xFF52666A),
+            ),
+          ),
+          const SizedBox(height: 26),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.blueBic,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: Text(
+                'Réessayer',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          const Spacer(),
+        ],
+      ),
+    ),
+  );
 }
 
 class _DetailPanel extends StatelessWidget {

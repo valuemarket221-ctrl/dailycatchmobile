@@ -12,6 +12,8 @@ class ProductOfferApiService {
     double? latitude,
     double? longitude,
     double radiusKm = 25,
+    int limit = 100,
+    int offset = 0,
   }) async {
     final body = await _api.get(
       '/api/v1/product-offers',
@@ -22,13 +24,24 @@ class ProductOfferApiService {
           'longitude': longitude.toString(),
           'radiusKm': radiusKm.toString(),
         },
+        'limit': limit.toString(),
+        'offset': offset.toString(),
       },
     );
 
-    final offersJson = body['offers'] as List<dynamic>;
-    return offersJson
-        .map((offer) => ProductOffer.fromJson(offer as Map<String, dynamic>))
-        .toList();
+    try {
+      final offersJson = BackendApiClient.requireList(body, 'offers');
+      return offersJson
+          .map((offer) => ProductOffer.fromJson(offer as Map<String, dynamic>))
+          .toList();
+    } on BackendApiException {
+      rethrow;
+    } catch (_) {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'invalid_backend_response',
+      );
+    }
   }
 }
 

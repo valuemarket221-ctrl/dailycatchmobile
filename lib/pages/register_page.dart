@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
@@ -60,7 +61,7 @@ class _RegisterPageState extends State<RegisterPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: Text(
           'Creer un compte',

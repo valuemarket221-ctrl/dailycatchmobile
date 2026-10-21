@@ -41,6 +41,7 @@ class RescuedProduct {
 
   /// Calcule le pourcentage d'éco-remboursement
   int get ecoSavingsPercentage {
+    if (originalPrice <= 0 || discountedPrice >= originalPrice) return 0;
     return ((1 - discountedPrice / originalPrice) * 100).round();
   }
 
@@ -159,10 +160,7 @@ class RescuedProduct {
     final pickupEndTime =
         offer.pickupEndsAt ?? pickupStartTime.add(const Duration(hours: 2));
     final category = offer.category?.trim();
-    final originalPrice =
-        offer.originalPrice <= offer.price
-            ? offer.price * 2
-            : offer.originalPrice;
+    final originalPrice = offer.originalPrice;
 
     return RescuedProduct(
       id: offer.id,
@@ -171,38 +169,20 @@ class RescuedProduct {
           offer.description?.trim().isNotEmpty == true
               ? offer.description!.trim()
               : 'Panier surprise préparé par ${offer.storeName}.',
-      imageUrl:
-          offer.mediaUrls.isNotEmpty
-              ? offer.mediaUrls.first
-              : _fallbackImageForCategory(category ?? offer.name),
+      imageUrl: offer.mediaUrls.isNotEmpty ? offer.mediaUrls.first : '',
       originalPrice: originalPrice,
       discountedPrice: offer.price,
       availableQuantity: offer.availableQuantity,
       reservedQuantity: 0,
       partnerId: offer.storeId,
       partnerName: offer.storeName,
-      partnerAddress: 'Commerce partenaire DailyCatch',
+      partnerAddress: offer.storeAddress ?? 'Adresse non renseignée',
       pickupStartTime: pickupStartTime,
       pickupEndTime: pickupEndTime,
       createdAt: now,
       category: category?.isNotEmpty == true ? category! : 'Poissons',
       distance: offer.distanceKm ?? 0,
     );
-  }
-
-  static String _fallbackImageForCategory(String value) {
-    final lower = value.toLowerCase();
-    if (lower.contains('crevette') ||
-        lower.contains('crust') ||
-        lower.contains('fruit')) {
-      return 'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png';
-    }
-    if (lower.contains('coquillage') ||
-        lower.contains('huitre') ||
-        lower.contains('huître')) {
-      return 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png';
-    }
-    return 'assets/images/ChatGPT Image 13 août 2026, 00_23_55.png';
   }
 
   @override

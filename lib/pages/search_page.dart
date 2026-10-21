@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:myapp/demo/demo_mode.dart';
+import 'package:myapp/models/product_offer.dart';
 import 'package:myapp/models/store_model.dart';
 import 'package:myapp/services/location_service.dart';
+import 'package:myapp/services/product_offer_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/utils/favorite_store_ids.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 import 'package:myapp/widgets/dailycatch_tile_layer.dart';
 
@@ -21,6 +26,7 @@ class _SearchPageState extends State<SearchPage> {
   final _searchController = TextEditingController();
   final _mapController = MapController();
   final _locationService = LocationService();
+  final _productOfferApiService = ProductOfferApiService();
 
   String _query = '';
   String _selectedCategory = 'Tous';
@@ -29,6 +35,11 @@ class _SearchPageState extends State<SearchPage> {
   String _selectedStoreId = '1';
   _LocationChoice _location = _locationChoices.first;
   bool _isLocating = false;
+  LatLng? _userPosition =
+      DemoMode.enabled ? const LatLng(52.5200, 13.4050) : null;
+  bool _isLoadingStores = false;
+  String? _loadError;
+  List<_MapStore> _stores = [];
 
   static const _categories = [
     'Tous',
@@ -36,109 +47,6 @@ class _SearchPageState extends State<SearchPage> {
     'Fruits de mer',
     'Coquillages',
     'Filtres',
-  ];
-
-  final List<_MapStore> _stores = [
-    _MapStore(
-      latLng: const LatLng(14.7458, -17.4572),
-      address: 'Yoff, Dakar',
-      reviews: 126,
-      store: Store(
-        id: '1',
-        name: 'Poissonnerie Yoff',
-        category: 'Poisson',
-        distance: '0,4 km',
-        originalPrice: 5000,
-        discountedPrice: 3000,
-        timeRemaining: '17:00 - 19:00',
-        productsLeft: 3,
-        image: 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
-        banner: 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
-        rating: 4.8,
-        totalProducts: 8,
-        productTypes: const ['Poisson', 'Panier surprise'],
-      ),
-    ),
-    _MapStore(
-      latLng: const LatLng(14.6878, -17.4476),
-      address: 'Fann, Dakar',
-      reviews: 98,
-      store: Store(
-        id: '4',
-        name: 'Ocean Fresh',
-        category: 'Fruits de mer',
-        distance: '0,7 km',
-        originalPrice: 5000,
-        discountedPrice: 3500,
-        timeRemaining: '16:30 - 18:30',
-        productsLeft: 4,
-        image: 'assets/images/ChatGPT Image 12 août 2026, 16_27_47.png',
-        banner: 'assets/images/ChatGPT Image 12 août 2026, 16_27_47.png',
-        rating: 4.6,
-        totalProducts: 10,
-        productTypes: const ['Fruits de mer', 'Crevettes'],
-      ),
-    ),
-    _MapStore(
-      latLng: const LatLng(14.7238, -17.4727),
-      address: 'Ouakam, Dakar',
-      reviews: 67,
-      store: Store(
-        id: '3',
-        name: 'Chez Mame Coumba',
-        category: 'Coquillages',
-        distance: '1,2 km',
-        originalPrice: 4500,
-        discountedPrice: 2800,
-        timeRemaining: '17:00 - 20:00',
-        productsLeft: 2,
-        image: 'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png',
-        banner: 'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png',
-        rating: 4.7,
-        totalProducts: 6,
-        productTypes: const ['Coquillages', 'Fruits de mer'],
-      ),
-    ),
-    _MapStore(
-      latLng: const LatLng(14.7111, -17.4922),
-      address: 'Almadies, Dakar',
-      reviews: 54,
-      store: Store(
-        id: '5',
-        name: 'La Mer à Table',
-        category: 'Poisson',
-        distance: '1,4 km',
-        originalPrice: 5000,
-        discountedPrice: 3200,
-        timeRemaining: '18:00 - 20:00',
-        productsLeft: 2,
-        image: 'assets/images/ChatGPT Image 13 août 2026, 00_23_55.png',
-        banner: 'assets/images/ChatGPT Image 13 août 2026, 00_23_55.png',
-        rating: 4.5,
-        totalProducts: 7,
-        productTypes: const ['Poisson', 'Arrivage local'],
-      ),
-    ),
-    _MapStore(
-      latLng: const LatLng(14.7002, -17.4588),
-      address: 'Mermoz, Dakar',
-      reviews: 81,
-      store: Store(
-        id: '2',
-        name: 'Sokhna Fish',
-        category: 'Poisson',
-        distance: '2,1 km',
-        originalPrice: 6000,
-        discountedPrice: 4000,
-        timeRemaining: '17:30 - 19:30',
-        productsLeft: 3,
-        image: 'assets/images/ChatGPT Image 13 août 2026, 00_45_21.png',
-        banner: 'assets/images/ChatGPT Image 13 août 2026, 00_45_21.png',
-        rating: 4.6,
-        totalProducts: 9,
-        productTypes: const ['Poisson', 'Fruits de mer'],
-      ),
-    ),
   ];
 
   List<_MapStore> get _filteredStores {
@@ -187,6 +95,7 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     FavoriteStoreIds.load();
+    _loadStores();
   }
 
   @override
@@ -198,6 +107,59 @@ class _SearchPageState extends State<SearchPage> {
   void _selectStore(_MapStore store) {
     setState(() => _selectedStoreId = store.store.id);
     _mapController.move(store.latLng, 13.5);
+  }
+
+  Future<void> _loadStores({LatLng? center}) async {
+    if (_isLoadingStores) return;
+    final lookupCenter = center ?? _location.center;
+    setState(() {
+      _isLoadingStores = true;
+      _loadError = null;
+    });
+
+    try {
+      final offers = await _productOfferApiService.getProductOffers(
+        latitude: lookupCenter.latitude,
+        longitude: lookupCenter.longitude,
+        radiusKm: _distanceLimitKm < 8 ? 30 : _distanceLimitKm,
+      );
+      final uniqueOffers = <String, ProductOffer>{};
+      for (final offer in offers) {
+        if (offer.hasValidCoordinates) {
+          uniqueOffers.putIfAbsent(offer.storeId, () => offer);
+        }
+      }
+      final stores =
+          uniqueOffers.values.indexed
+              .map(
+                (entry) => _mapStoreFromOffer(
+                  entry.$2,
+                  entry.$1,
+                  related:
+                      offers
+                          .where((offer) => offer.storeId == entry.$2.storeId)
+                          .toList(),
+                ),
+              )
+              .toList();
+      if (!mounted) return;
+      setState(() {
+        _stores = stores;
+        _selectedStoreId = _stores.isEmpty ? '' : _stores.first.store.id;
+        _loadError =
+            stores.isEmpty ? 'Aucun panier localisable dans cette zone.' : null;
+        _isLoadingStores = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _stores = [];
+        _selectedStoreId = _stores.isEmpty ? '' : _stores.first.store.id;
+        final message = ApiErrorMessages.fromObject(error);
+        _loadError = message;
+        _isLoadingStores = false;
+      });
+    }
   }
 
   void _selectCategory(String category) {
@@ -216,7 +178,18 @@ class _SearchPageState extends State<SearchPage> {
     if (_isLocating) return;
     setState(() => _isLocating = true);
     try {
-      final location = await _locationService.resolveCurrentLocation();
+      final location = await _locationService.resolveCurrentLocation(
+        requestPermission: true,
+      );
+      if (mounted) {
+        setState(
+          () =>
+              _userPosition =
+                  DemoMode.enabled || !location.isFallback
+                      ? LatLng(location.latitude, location.longitude)
+                      : null,
+        );
+      }
       final choice = _LocationChoice(
         location.label,
         LatLng(location.latitude, location.longitude),
@@ -224,6 +197,7 @@ class _SearchPageState extends State<SearchPage> {
       if (!mounted) return;
       setState(() => _location = choice);
       _mapController.move(choice.center, 13);
+      await _loadStores(center: choice.center);
       if (location.warning != null) _showSnack(location.warning!);
     } finally {
       if (mounted) setState(() => _isLocating = false);
@@ -234,6 +208,7 @@ class _SearchPageState extends State<SearchPage> {
     setState(() => _location = choice);
     _mapController.move(choice.center, 13);
     Navigator.of(context).pop();
+    _loadStores(center: choice.center);
   }
 
   void _showLocationSheet() {
@@ -317,13 +292,6 @@ class _SearchPageState extends State<SearchPage> {
                                   () => setSheetState(() => nextSort = 'price'),
                             ),
                             _FilterPill(
-                              label: 'Note',
-                              active: nextSort == 'rating',
-                              onTap:
-                                  () =>
-                                      setSheetState(() => nextSort = 'rating'),
-                            ),
-                            _FilterPill(
                               label: 'Disponibilité',
                               active: nextSort == 'stock',
                               onTap:
@@ -371,6 +339,7 @@ class _SearchPageState extends State<SearchPage> {
                                     stores.isEmpty ? '' : stores.first.store.id;
                               });
                               Navigator.of(context).pop();
+                              _loadStores(center: _location.center);
                             },
                             style: FilledButton.styleFrom(
                               backgroundColor: AppTheme.primaryColor,
@@ -482,6 +451,64 @@ class _SearchPageState extends State<SearchPage> {
     context.push('/store/${item.store.id}', extra: item.store);
   }
 
+  _MapStore _mapStoreFromOffer(
+    ProductOffer offer,
+    int index, {
+    List<ProductOffer>? related,
+  }) {
+    final image = offer.mediaUrls.isNotEmpty ? offer.mediaUrls.first : '';
+    final category =
+        offer.category?.trim().isNotEmpty == true
+            ? offer.category!.trim()
+            : 'Non renseignée';
+    final latLng = LatLng(offer.latitude!, offer.longitude!);
+    final distance =
+        offer.distanceKm == null
+            ? 'Distance indisponible'
+            : '${offer.distanceKm!.toStringAsFixed(1)} km';
+
+    return _MapStore(
+      latLng: latLng,
+      address:
+          offer.storeAddress?.trim().isNotEmpty == true
+              ? offer.storeAddress!
+              : 'Adresse non renseignée',
+      reviews: offer.storeReviewCount,
+      store: Store(
+        id: offer.storeId,
+        name: offer.storeName,
+        category: category,
+        distance: distance,
+        originalPrice: offer.originalPrice,
+        discountedPrice: offer.price,
+        timeRemaining: _pickupTime(offer.pickupStartsAt, offer.pickupEndsAt),
+        productsLeft:
+            related?.fold<int>(
+              0,
+              (sum, item) => sum + item.availableQuantity,
+            ) ??
+            offer.availableQuantity,
+        image: image,
+        banner: image,
+        rating: offer.storeRating ?? 0,
+        totalProducts: offer.availableQuantity,
+        productTypes:
+            {
+              category,
+              'Panier surprise',
+              ...?related?.map((offer) => offer.category ?? 'Non renseignée'),
+            }.toList(),
+      ),
+    );
+  }
+
+  String _pickupTime(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return 'Créneau non renseigné';
+    String hhmm(DateTime date) =>
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${hhmm(start.toLocal())} - ${hhmm(end.toLocal())}';
+  }
+
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -509,28 +536,53 @@ class _SearchPageState extends State<SearchPage> {
               mapController: _mapController,
               options: MapOptions(
                 initialCenter: _location.center,
-                initialZoom: 13,
-                minZoom: 11,
+                initialZoom: 12.5,
+                minZoom: 5,
                 maxZoom: 17,
               ),
               children: [
                 const DailyCatchTileLayer(),
                 MarkerLayer(
-                  markers:
-                      stores
-                          .map(
-                            (item) => Marker(
-                              point: item.latLng,
-                              width: 112,
-                              height: 116,
-                              child: _PhotoMarker(
-                                item: item,
-                                selected: item.store.id == selected?.store.id,
-                                onTap: () => _selectStore(item),
-                              ),
+                  markers: [
+                    ...stores.map(
+                      (item) => Marker(
+                        point: item.latLng,
+                        width: 112,
+                        height: 116,
+                        child: _PhotoMarker(
+                          item: item,
+                          selected: item.store.id == selected?.store.id,
+                          onTap: () => _selectStore(item),
+                        ),
+                      ),
+                    ),
+                    if (_userPosition != null)
+                      Marker(
+                        point: _userPosition!,
+                        width: 28,
+                        height: 28,
+                        child: Tooltip(
+                          message:
+                              DemoMode.enabled
+                                  ? 'Position de demonstration'
+                                  : 'Votre position',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3689FF),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x553689FF),
+                                  blurRadius: 12,
+                                  spreadRadius: 6,
+                                ),
+                              ],
                             ),
-                          )
-                          .toList(),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -556,9 +608,20 @@ class _SearchPageState extends State<SearchPage> {
               onFilterTap: _openFilters,
             ),
           ),
+          if (_isLoadingStores || _loadError != null)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 142,
+              left: 16,
+              right: 16,
+              child: _MapApiBanner(
+                loading: _isLoadingStores,
+                message: _loadError,
+                onRetry: () => _loadStores(center: _location.center),
+              ),
+            ),
           Positioned(
             right: 16,
-            bottom: selected == null ? 26 : 264,
+            bottom: selected == null ? 26 : 300,
             child: Column(
               children: [
                 _FloatingMapButton(
@@ -574,20 +637,40 @@ class _SearchPageState extends State<SearchPage> {
               ],
             ),
           ),
+          const Positioned(
+            left: 4,
+            top: 170,
+            child: ColoredBox(
+              color: Colors.white,
+              child: Padding(
+                padding: EdgeInsets.all(4),
+                child: Text(
+                  '© OpenStreetMap contributors',
+                  style: TextStyle(fontSize: 10, color: Colors.black87),
+                ),
+              ),
+            ),
+          ),
           if (selected != null)
             Positioned(
-              left: 16,
-              right: 16,
-              bottom: 12,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: ValueListenableBuilder<Set<String>>(
                 valueListenable: FavoriteStoreIds.ids,
                 builder:
-                    (context, favorites, _) => _StorePreviewSheet(
-                      item: selected,
-                      favorite: favorites.contains(selected.store.id),
-                      onFavorite:
-                          () => FavoriteStoreIds.toggle(selected.store.id),
-                      onOpen: () => _openStore(selected),
+                    (context, favorites, _) => Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 520),
+                        child: _StorePreviewSheet(
+                          item: selected,
+                          favorite: favorites.contains(selected.store.id),
+                          onFavorite:
+                              () => FavoriteStoreIds.toggle(selected.store.id),
+                          onOpen: () => _openStore(selected),
+                        ),
+                      ),
                     ),
               ),
             )
@@ -633,7 +716,73 @@ class _LocationChoice {
   final LatLng center;
 }
 
+class _MapApiBanner extends StatelessWidget {
+  const _MapApiBanner({
+    required this.loading,
+    required this.message,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final String? message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(14),
+    elevation: 5,
+    shadowColor: Colors.black.withValues(alpha: .12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          if (loading)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.reef,
+              ),
+            )
+          else
+            const Icon(Icons.info_outline, size: 17, color: AppTheme.reef),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              loading ? 'Chargement des paniers proches...' : message ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.captionS.copyWith(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (!loading) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
 const _locationChoices = [
+  _LocationChoice('Berlin, Allemagne', LatLng(52.5200, 13.4050)),
+  _LocationChoice('Hambourg, Allemagne', LatLng(53.5511, 9.9937)),
+  _LocationChoice('Munich, Allemagne', LatLng(48.1351, 11.5820)),
+  _LocationChoice('Francfort, Allemagne', LatLng(50.1109, 8.6821)),
   _LocationChoice('Dakar, Sénégal', LatLng(14.6928, -17.4467)),
   _LocationChoice('Yoff', LatLng(14.7458, -17.4572)),
   _LocationChoice('Almadies', LatLng(14.7392, -17.5212)),
@@ -826,8 +975,10 @@ class _PhotoMarker extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    item.store.banner,
+                  AppRemoteImage(
+                    path: item.store.banner,
+                    width: 88,
+                    height: 72,
                     fit: BoxFit.cover,
                     filterQuality: FilterQuality.medium,
                   ),
@@ -914,7 +1065,6 @@ class _StorePreviewSheet extends StatelessWidget {
     required this.onFavorite,
     required this.onOpen,
   });
-
   final _MapStore item;
   final bool favorite;
   final VoidCallback onFavorite;
@@ -924,57 +1074,52 @@ class _StorePreviewSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = item.store;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.all(14),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .18),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 42,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD8E1DF),
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  store.image,
-                  width: 118,
-                  height: 112,
+                borderRadius: BorderRadius.circular(8),
+                child: AppRemoteImage(
+                  path: store.image,
+                  width: 96,
+                  height: 132,
                   fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const _OpenBadge(),
+                        if (store.productsLeft > 0)
+                          const _OpenBadge()
+                        else
+                          const Text('Épuisé'),
                         const Spacer(),
-                        IconButton(
-                          onPressed: onFavorite,
-                          icon: Icon(
-                            favorite ? Icons.favorite : Icons.favorite_border,
-                            color: AppTheme.lagoon,
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            tooltip:
+                                favorite
+                                    ? 'Retirer des favoris'
+                                    : 'Ajouter aux favoris',
+                            onPressed: onFavorite,
+                            icon: Icon(
+                              favorite ? Icons.favorite : Icons.favorite_border,
+                              size: 21,
+                            ),
                           ),
                         ),
                       ],
@@ -983,144 +1128,82 @@ class _StorePreviewSheet extends StatelessWidget {
                       store.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.subtitleM.copyWith(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w900,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 5),
                     _MetaLine(
                       icon: Icons.star,
                       label:
-                          '${store.rating.toStringAsFixed(1)} (${item.reviews} avis)',
+                          item.reviews > 0
+                              ? '${store.rating.toStringAsFixed(1)} (${item.reviews} avis)'
+                              : 'Avis indisponibles',
                       iconColor: AppTheme.saffron,
                     ),
                     _MetaLine(
                       icon: Icons.location_on_outlined,
-                      label: '${item.address} • ${store.distance}',
+                      label: item.address,
+                    ),
+                    Text(
+                      '${store.distance} de vous',
+                      style: AppTextStyles.captionS,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${store.productsLeft} paniers disponibles',
+                      style: AppTextStyles.captionS.copyWith(
+                        color: AppTheme.reef,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7FAF9),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.softBorder),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.shopping_bag_outlined,
-                      color: AppTheme.lagoon,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Panier surprise',
-                        style: AppTextStyles.captionL.copyWith(
-                          color: AppTheme.textPrimary,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      _formatPrice(store.discountedPrice),
-                      style: AppTextStyles.subtitleS.copyWith(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.shopping_bag_outlined, size: 16),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text('Panier surprise', style: TextStyle(fontSize: 12)),
+              ),
+              Text(
+                _formatPrice(store.discountedPrice),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${store.productsLeft} paniers disponibles',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.captionS.copyWith(
-                          color: AppTheme.reef,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatPrice(store.originalPrice),
-                      style: AppTextStyles.captionS.copyWith(
-                        color: AppTheme.textSecondary,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '-${store.discountPercentage}%',
-                      style: AppTextStyles.captionS.copyWith(
-                        color: AppTheme.coral,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _formatPrice(store.originalPrice),
+                style: const TextStyle(
+                  fontSize: 10,
+                  decoration: TextDecoration.lineThrough,
                 ),
-                const SizedBox(height: 9),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule_outlined,
-                      color: AppTheme.textSecondary,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        'Retrait aujourd’hui',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.captionS,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      store.timeRemaining,
-                      style: AppTextStyles.captionS.copyWith(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          _MetaLine(
+            icon: Icons.schedule_outlined,
+            label: 'Retrait aujourd’hui · ${store.timeRemaining}',
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 44,
             child: FilledButton(
               onPressed: onOpen,
               style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
+                backgroundColor: AppTheme.reef,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(
-                'Voir les paniers',
-                style: AppTextStyles.subtitleS.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              child: const Text('Voir les paniers'),
             ),
           ),
         ],
@@ -1161,8 +1244,8 @@ class _StoreListRow extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                store.image,
+              child: AppRemoteImage(
+                path: store.image,
                 width: 96,
                 height: 92,
                 fit: BoxFit.cover,

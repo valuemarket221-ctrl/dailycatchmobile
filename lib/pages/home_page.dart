@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/models/product_offer.dart';
 import 'package:myapp/models/store_model.dart';
@@ -7,6 +8,8 @@ import 'package:myapp/services/location_service.dart';
 import 'package:myapp/services/product_offer_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/utils/store_utils.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 import 'package:myapp/widgets/store_card.dart';
@@ -139,7 +142,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _stores = _fallbackStores;
+    _stores =
+        ApiEnvironment.isDemoFallbackAllowed ? _fallbackStores : <Store>[];
     _updateFilteredStores();
     _loadNearbyOffers();
   }
@@ -175,20 +179,30 @@ class _HomePageState extends State<HomePage> {
       final stores = offers.map(_storeFromOffer).toList();
       if (!mounted) return;
       setState(() {
-        _stores = stores.isEmpty ? _fallbackStores : stores;
+        _stores =
+            stores.isNotEmpty || !ApiEnvironment.isDemoFallbackAllowed
+                ? stores
+                : _fallbackStores;
         _locationLabel = location.label;
         _nearbyError =
             stores.isEmpty
-                ? 'Aucun panier proche: suggestions par défaut'
+                ? ApiEnvironment.isDemoFallbackAllowed
+                    ? 'Aucun panier API proche: suggestions de démonstration'
+                    : 'Aucun panier proche disponible pour le moment.'
                 : location.warning;
         _isLoadingNearby = false;
         _updateFilteredStores();
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _stores = _fallbackStores;
-        _nearbyError = 'Backend indisponible: paniers de démonstration';
+        _stores =
+            ApiEnvironment.isDemoFallbackAllowed ? _fallbackStores : <Store>[];
+        final message = ApiErrorMessages.fromObject(error);
+        _nearbyError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? '$message Paniers de démonstration affichés.'
+                : message;
         _isLoadingNearby = false;
         _updateFilteredStores();
       });
@@ -489,9 +503,9 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: AppTheme.md),
               Expanded(
                 child: _buildActionButton(
-                  label: 'Favoris',
-                  icon: Icons.favorite_border,
-                  onTap: () => context.go('/favorites'),
+                  label: 'Catégories',
+                  icon: Icons.grid_view_outlined,
+                  onTap: () => context.push('/categories'),
                   primary: false,
                 ),
               ),
@@ -731,7 +745,7 @@ class _HomePageState extends State<HomePage> {
       leading: Icon(icon, color: AppTheme.reef),
       title: Text(title, style: AppTextStyles.bodyM),
       onTap: () {
-        context.pop();
+        safePop(context);
         context.push(route);
       },
     );
@@ -742,17 +756,24 @@ class _HomePageState extends State<HomePage> {
         offer.distanceKm == null
             ? 'Proche'
             : '${offer.distanceKm!.toStringAsFixed(1)} km';
+    final image =
+        offer.mediaUrls.isNotEmpty
+            ? offer.mediaUrls.first
+            : _imageForOffer(offer.name);
     return Store(
       id: offer.storeId,
       name: offer.storeName,
-      category: _categoryFromName(offer.name),
+      category:
+          offer.category?.trim().isNotEmpty == true
+              ? offer.category!.trim()
+              : _categoryFromName(offer.name),
       distance: distance,
       originalPrice: offer.originalPrice,
       discountedPrice: offer.price,
       timeRemaining: _pickupTime(offer.pickupStartsAt, offer.pickupEndsAt),
       productsLeft: offer.availableQuantity,
-      image: _imageForOffer(offer.name),
-      banner: _imageForOffer(offer.name),
+      image: image,
+      banner: image,
       rating: 4.6,
       totalProducts: offer.availableQuantity,
       productTypes: [_categoryFromName(offer.name), 'Surprise'],

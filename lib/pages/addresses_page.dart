@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/client_api_service.dart';
 
 class AddressesPage extends StatefulWidget {
   const AddressesPage({super.key});
@@ -11,13 +13,51 @@ class AddressesPage extends StatefulWidget {
 }
 
 class _AddressesPageState extends State<AddressesPage> {
-  final List<String> _addresses = [
-    'Domicile\nSacré-Cœur 3, Dakar',
-    'Bureau\nPlateau, Dakar',
-  ];
+  final ClientApiService _clientApiService = ClientApiService();
+  var _isLoading = true;
+  String? _loadError;
+  List<ClientAddressDto> _addresses = const [];
 
-  void _addAddress() {
-    context.push('/new-address');
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final addresses = await _clientApiService.getMyAddresses();
+      if (!mounted) return;
+      setState(() {
+        _addresses = addresses;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'Adresses indisponibles. Réessayez.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _addAddress() async {
+    await context.push('/new-address');
+    if (mounted) await _loadAddresses();
+  }
+
+  Future<void> _deleteAddress(ClientAddressDto address) async {
+    try {
+      await _clientApiService.deleteAddress(address.id);
+      if (mounted) await _loadAddresses();
+    } catch (_) {
+      if (mounted) _message('Suppression impossible');
+    }
   }
 
   void _message(String text) {
@@ -35,18 +75,74 @@ class _AddressesPageState extends State<AddressesPage> {
     title: 'MES ADRESSES',
     child: Column(
       children: [
-        ..._addresses.asMap().entries.map((entry) {
-          final index = entry.key;
-          final address = entry.value;
-          return _CardRow(
-            icon: index == 0 ? Icons.home_outlined : Icons.location_on_outlined,
-            title: address.split('\n').first,
-            subtitle: address.split('\n').last,
-            trailing: index == 0 ? 'Par défaut' : 'Modifier',
-            onTap: () => _message('Adresse sélectionnée'),
-          );
-        }),
-        const Spacer(),
+        if (_isLoading)
+          const Expanded(
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.blueBic),
+            ),
+          )
+        else if (_loadError != null)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _loadError!,
+                    style: _subtitle,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  TextButton(
+                    onPressed: _loadAddresses,
+                    child: Text('Réessayer', style: _link),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (_addresses.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                'Aucune adresse enregistrée',
+                style: _subtitle,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.blueBic,
+              onRefresh: _loadAddresses,
+              child: ListView(
+                children: [
+                  ..._addresses.map((address) {
+                    return _CardRow(
+                      icon:
+                          address.isDefault
+                              ? Icons.home_outlined
+                              : Icons.location_on_outlined,
+                      title: address.label,
+                      subtitle: [
+                        address.address,
+                        if ((address.complement ?? '').isNotEmpty)
+                          address.complement!,
+                        address.country,
+                      ].join(', '),
+                      trailing: address.isDefault ? 'Par défaut' : 'Supprimer',
+                      onTap:
+                          () =>
+                              address.isDefault
+                                  ? _message('Adresse par défaut')
+                                  : _deleteAddress(address),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
         _PrimaryButton(label: 'Ajouter une adresse', onPressed: _addAddress),
       ],
     ),
@@ -69,7 +165,7 @@ class _SecondaryShell extends StatelessWidget {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
                 const Spacer(),

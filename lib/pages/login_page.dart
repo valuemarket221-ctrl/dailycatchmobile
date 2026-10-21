@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/auth_api_service.dart';
+import 'package:myapp/services/backend_api_client.dart';
 import 'package:myapp/styles/app_theme.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/utils/local_auth_session.dart';
 
 class LoginPage extends StatefulWidget {
@@ -50,13 +53,20 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      final token = await credential.user?.getIdTokenResult(true);
-      final role = token?.claims?['role'];
+      await credential.user?.getIdToken(true);
+      final session = await AuthApiService().getCurrentSession();
+      await LocalAuthSession.saveBackendSession(
+        user: session.user,
+        homeRoute: session.homeRoute,
+      );
       if (!mounted) return;
-      context.go(_routeForRole(role is String ? role : null));
+      context.go(session.homeRoute);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showErrorSnackBar(_friendlyAuthError(e.code));
+    } on BackendApiException catch (e) {
+      if (!mounted) return;
+      _showErrorSnackBar(ApiErrorMessages.fromCode(e.code));
     } on LocalAuthException catch (e) {
       if (!mounted) return;
       _showErrorSnackBar(e.message);
@@ -66,15 +76,6 @@ class _LoginPageState extends State<LoginPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  String _routeForRole(String? role) {
-    return switch (role) {
-      'admin' => '/admin/dashboard',
-      'partner' => '/partner/mobile-dashboard',
-      'support' => '/admin/dashboard',
-      _ => '/home',
-    };
   }
 
   String _friendlyAuthError(String code) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:myapp/services/partner_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/utils/api_environment.dart';
 
 class ProductsListPage extends StatefulWidget {
   const ProductsListPage({super.key});
@@ -11,15 +12,18 @@ class ProductsListPage extends StatefulWidget {
 }
 
 class _ProductsListPageState extends State<ProductsListPage> {
-  static const _storeId = 'store_port';
-  static const _storeName = 'Poissonnerie du Port';
-  static const _latitude = 14.6928;
-  static const _longitude = -17.4467;
+  static const _fallbackStoreContext = PartnerStoreContext(
+    storeId: 'store_port',
+    storeName: 'Poissonnerie du Port',
+    latitude: 14.6928,
+    longitude: -17.4467,
+  );
 
   final PartnerApiService _partnerApiService = PartnerApiService();
   bool _isLoading = true;
   String? _loadError;
   List<Map<String, dynamic>> _offers = const [];
+  PartnerStoreContext? _storeContext;
 
   @override
   void initState() {
@@ -34,20 +38,40 @@ class _ProductsListPageState extends State<ProductsListPage> {
     });
 
     try {
-      final offers = await _partnerApiService.getStoreOffers(_storeId);
+      final storeContext = await _resolveStoreContext();
+      final offers = await _partnerApiService.getStoreOffers(
+        storeContext.storeId,
+      );
       if (!mounted) return;
       setState(() {
+        _storeContext = storeContext;
         _offers = offers;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _offers = _fallbackOffers;
-        _loadError = 'Mode démonstration: connexion backend indisponible';
+        _offers =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackOffers
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Mode démonstration: connexion backend indisponible'
+                : 'Paniers vendeur indisponibles.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<PartnerStoreContext> _resolveStoreContext() async {
+    final storeContext = await _partnerApiService.getMyStoreContext();
+    if (storeContext != null) return storeContext;
+    if (ApiEnvironment.isDemoFallbackAllowed) return _fallbackStoreContext;
+    throw const PartnerApiException(
+      statusCode: 404,
+      message: 'partner_profile_missing',
+    );
   }
 
   @override
@@ -457,10 +481,12 @@ class _ProductsListPageState extends State<ProductsListPage> {
               );
 
               try {
+                final storeContext =
+                    _storeContext ?? await _resolveStoreContext();
                 await _partnerApiService.createOffer(
                   PartnerOfferRequest(
-                    storeId: _storeId,
-                    storeName: _storeName,
+                    storeId: storeContext.storeId,
+                    storeName: storeContext.storeName,
                     name: nameController.text.trim(),
                     description: descController.text.trim(),
                     currency: 'xof',
@@ -469,8 +495,8 @@ class _ProductsListPageState extends State<ProductsListPage> {
                     availableQuantity: quantity,
                     pickupStartsAt: pickupStart,
                     pickupEndsAt: pickupEnd,
-                    latitude: _latitude,
-                    longitude: _longitude,
+                    latitude: storeContext.latitude,
+                    longitude: storeContext.longitude,
                     active: true,
                   ),
                 );

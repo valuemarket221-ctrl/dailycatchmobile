@@ -12,8 +12,9 @@ class MessageApiService {
 
   Future<List<Map<String, dynamic>>> getConversations() async {
     final body = await _getJson('/api/v1/messages/conversations');
-    return (body['conversations'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    return _parse(
+      () => BackendApiClient.requireObjectList(body, 'conversations'),
+    );
   }
 
   Future<String> createConversation({
@@ -29,14 +30,14 @@ class MessageApiService {
       'partnerUserId': partnerUserId,
       if (storeId != null && storeId.isNotEmpty) 'storeId': storeId,
     });
-    return body['conversationId'] as String;
+    return _parse(() => BackendApiClient.requireString(body, 'conversationId'));
   }
 
   Future<List<Map<String, dynamic>>> getMessages(String conversationId) async {
     final body = await _getJson(
       '/api/v1/messages/conversations/$conversationId/messages',
     );
-    return (body['messages'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return _parse(() => BackendApiClient.requireObjectList(body, 'messages'));
   }
 
   Future<String> sendMessage({
@@ -47,7 +48,7 @@ class MessageApiService {
       '/api/v1/messages/conversations/$conversationId/messages',
       {'body': body},
     );
-    return response['messageId'] as String;
+    return _parse(() => BackendApiClient.requireString(response, 'messageId'));
   }
 
   Future<int> markConversationAsRead(String conversationId) async {
@@ -55,7 +56,7 @@ class MessageApiService {
       '/api/v1/messages/conversations/$conversationId/read',
       const {},
     );
-    return body['updatedCount'] as int;
+    return _parse(() => BackendApiClient.requireInt(body, 'updatedCount'));
   }
 
   Future<Map<String, dynamic>> _getJson(String path) async {
@@ -74,6 +75,19 @@ class MessageApiService {
       return await _api.post(path, body: payload);
     } on BackendApiException catch (error) {
       throw MessageApiException.fromBackend(error);
+    }
+  }
+
+  T _parse<T>(T Function() parser) {
+    try {
+      return parser();
+    } on BackendApiException catch (error) {
+      throw MessageApiException.fromBackend(error);
+    } catch (_) {
+      throw const MessageApiException(
+        statusCode: 200,
+        message: 'invalid_backend_response',
+      );
     }
   }
 }

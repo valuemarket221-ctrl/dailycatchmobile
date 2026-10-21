@@ -1,12 +1,15 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:myapp/services/auth_api_service.dart';
+import 'package:myapp/services/backend_api_client.dart';
+import 'package:myapp/utils/api_error_messages.dart';
+import 'package:myapp/utils/local_auth_session.dart';
 
 /// AuthProvider — gère l'état d'authentification Firebase en temps réel
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final AuthApiService _authApiService = AuthApiService();
 
   User? _user;
   bool _isLoading = false;
@@ -36,14 +39,23 @@ class AuthProvider with ChangeNotifier {
   Future<bool> signIn(String email, String password) async {
     _setLoading(true);
     try {
-      await _auth.signInWithEmailAndPassword(
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
+      );
+      await credential.user?.getIdToken(true);
+      final session = await _authApiService.getCurrentSession();
+      await LocalAuthSession.saveBackendSession(
+        user: session.user,
+        homeRoute: session.homeRoute,
       );
       _errorMessage = null;
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _friendlyError(e.code);
+      return false;
+    } on BackendApiException catch (e) {
+      _errorMessage = ApiErrorMessages.fromCode(e.code);
       return false;
     } catch (e) {
       _errorMessage = 'Une erreur est survenue. Réessayez.';
@@ -64,25 +76,25 @@ class AuthProvider with ChangeNotifier {
 
       // Mettre à jour le displayName Firebase
       await credential.user?.updateDisplayName(name.trim());
+      await credential.user?.getIdToken(true);
+      final session = await _authApiService.registerClient(
+        displayName: name.trim(),
+        email: email.trim(),
+      );
+      await LocalAuthSession.saveBackendSession(
+        user: session.user,
+        homeRoute: session.homeRoute,
+      );
       await credential.user?.reload();
       _user = _auth.currentUser;
-
-      // Sauvegarder le profil dans Firestore
-      if (credential.user != null) {
-        await _firestore
-            .collection('users')
-            .doc(credential.user!.uid)
-            .set({
-          'name': name.trim(),
-          'email': email.trim(),
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
 
       _errorMessage = null;
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _friendlyError(e.code);
+      return false;
+    } on BackendApiException catch (e) {
+      _errorMessage = ApiErrorMessages.fromCode(e.code);
       return false;
     } catch (e) {
       _errorMessage = 'Une erreur est survenue. Réessayez.';
@@ -95,7 +107,7 @@ class AuthProvider with ChangeNotifier {
   // --- Déconnexion ---
   Future<void> signOut() async {
     try {
-      await _auth.signOut();
+      await LocalAuthSession.signOut();
     } catch (e) {
       debugPrint('signOut error: $e');
     }

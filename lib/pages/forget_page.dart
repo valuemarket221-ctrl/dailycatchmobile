@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
@@ -95,7 +96,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       children: [
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: _BackButton(onTap: () => context.pop()),
+                          child: _BackButton(onTap: () => safePop(context)),
                         ),
                         const SizedBox(height: 10),
                         Image.asset(

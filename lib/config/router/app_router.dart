@@ -12,6 +12,8 @@ import 'package:myapp/pages/favorite_page.dart';
 import 'package:myapp/pages/profile_page.dart';
 import 'package:myapp/pages/messages_page.dart';
 import 'package:myapp/pages/categories_page.dart';
+import 'package:myapp/pages/categorie_pages.dart';
+import 'package:myapp/pages/location_onboarding_page.dart';
 import 'package:myapp/pages/faq_page.dart';
 import 'package:myapp/pages/contact_page.dart';
 import 'package:myapp/pages/client_missing_flow_pages.dart';
@@ -24,7 +26,6 @@ import 'package:myapp/pages/settings_page.dart';
 import 'package:myapp/pages/help_page.dart';
 import 'package:myapp/pages/legal_page.dart';
 import 'package:myapp/pages/order_history_page.dart';
-import 'package:myapp/pages/pickup_page.dart' as pickup;
 import 'package:myapp/pages/cart_page.dart';
 import 'package:myapp/pages/delivery_page.dart';
 import 'package:myapp/pages/payment_page.dart';
@@ -43,16 +44,13 @@ import 'package:myapp/pages/notification_page.dart';
 import 'package:myapp/pages/product_selection_page.dart';
 import 'package:myapp/pages/detail_page.dart';
 import 'package:myapp/pages/my_reservations_page.dart';
-import 'package:myapp/pages/pickup_confirmation_page.dart'
-    as pickup_confirmation;
+import 'package:myapp/pages/rate_review_page.dart';
 import 'package:myapp/pages/qr_scanner_page.dart';
 import 'package:myapp/pages/rescued_products_page.dart';
 import 'package:myapp/pages/parametre_page.dart';
 import 'package:myapp/pages/role_selection_page.dart';
 import 'package:myapp/pages/register_client_page.dart';
 import 'package:myapp/pages/register_partner_page.dart';
-import 'package:myapp/pages/prototypes/offer.dart';
-import 'package:myapp/pages/prototypes/precommande.dart';
 
 // Admin pages
 import 'package:myapp/pages/Admin/admin_dashboard_page.dart';
@@ -133,7 +131,7 @@ final GoRouter router = GoRouter(
       path: '/permission-location',
       builder:
           (BuildContext context, GoRouterState state) =>
-              const SystemStatePage(kind: SystemStateKind.locationPermission),
+              const LocationOnboardingPage(),
     ),
 
     GoRoute(
@@ -246,6 +244,13 @@ final GoRouter router = GoRouter(
         return const CategoriesPage();
       },
     ),
+    GoRoute(
+      path: '/category-products',
+      builder:
+          (context, state) => ListeProduitsPage(
+            initialCategory: state.uri.queryParameters['category'] ?? 'Tous',
+          ),
+    ),
 
     GoRoute(
       path: '/messages',
@@ -266,28 +271,37 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/pickup',
       builder: (BuildContext context, GoRouterState state) {
-        return const pickup.PickupPage();
+        return const MyReservationsPage();
       },
     ),
 
     GoRoute(
       path: '/reservation-detail',
       builder: (BuildContext context, GoRouterState state) {
-        return const ReservationDetailPage();
+        final extra = state.extra;
+        return ReservationDetailPage(
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
     GoRoute(
       path: '/withdrawal-code',
       builder: (BuildContext context, GoRouterState state) {
-        return const WithdrawalCodePage();
+        final extra = state.extra;
+        return WithdrawalCodePage(
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
     GoRoute(
       path: '/order-tracking',
       builder: (BuildContext context, GoRouterState state) {
-        return const OrderTrackingPage();
+        final extra = state.extra;
+        return OrderTrackingPage(
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
@@ -308,14 +322,14 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/pickup-confirmation',
       builder: (BuildContext context, GoRouterState state) {
-        return const pickup_confirmation.PickupConfirmationPage();
+        return const MyReservationsPage();
       },
     ),
 
     GoRoute(
       path: '/rate-review',
       builder: (BuildContext context, GoRouterState state) {
-        return const ClientReviewPage();
+        return const RateReviewPage();
       },
     ),
 
@@ -352,14 +366,20 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/cancel-order',
       builder: (BuildContext context, GoRouterState state) {
-        return const CancelOrderPage();
+        final extra = state.extra;
+        return CancelOrderPage(
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
     GoRoute(
       path: '/refund-request',
       builder: (BuildContext context, GoRouterState state) {
-        return const RefundRequestPage();
+        final extra = state.extra;
+        return RefundRequestPage(
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
@@ -396,7 +416,11 @@ final GoRouter router = GoRouter(
       path: '/qr-code/:id',
       builder: (BuildContext context, GoRouterState state) {
         final reservationId = state.pathParameters['id'] ?? '';
-        return WithdrawalCodePage(reservationId: reservationId);
+        final extra = state.extra;
+        return WithdrawalCodePage(
+          reservationId: reservationId,
+          reservation: extra is Reservation ? extra : null,
+        );
       },
     ),
 
@@ -449,14 +473,14 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/offer',
       builder: (BuildContext context, GoRouterState state) {
-        return const OfferPage();
+        return const SearchPage();
       },
     ),
 
     GoRoute(
       path: '/precommande',
       builder: (BuildContext context, GoRouterState state) {
-        return const PrecommandePage();
+        return const MyReservationsPage();
       },
     ),
 
@@ -701,16 +725,18 @@ final GoRouter router = GoRouter(
 
     GoRoute(
       path: '/partner/client-chat',
-      builder:
-          (BuildContext context, GoRouterState state) =>
-              const PartnerClientChatPage(),
+      builder: (BuildContext context, GoRouterState state) {
+        final order = state.extra as Map<String, dynamic>?;
+        return PartnerClientChatPage(order: order ?? {});
+      },
     ),
 
     GoRoute(
       path: '/partner/client-profile',
-      builder:
-          (BuildContext context, GoRouterState state) =>
-              const PartnerClientProfilePage(),
+      builder: (BuildContext context, GoRouterState state) {
+        final order = state.extra as Map<String, dynamic>?;
+        return PartnerClientProfilePage(order: order ?? {});
+      },
     ),
 
     GoRoute(
@@ -962,71 +988,49 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/admin/orders',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Réservations',
-          icon: Icons.shopping_bag_outlined,
-        );
+        return const AdminDashboardPage();
       },
     ),
 
     GoRoute(
       path: '/admin/products',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Paniers',
-          icon: Icons.inventory_2_outlined,
-          message:
-              'Les paniers sont publiés par les vendeurs. L’admin surveille les abus, les ruptures et la qualité.',
-        );
+        return const AdminDashboardPage();
       },
     ),
 
     GoRoute(
       path: '/admin/products/new',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Création réservée aux vendeurs',
-          icon: Icons.storefront_outlined,
-          message:
-              'Chaque partenaire crée ses paniers depuis son espace vendeur. L’admin valide les partenaires et contrôle la plateforme.',
-        );
+        return const PartnerRegistrationPage();
       },
     ),
 
     GoRoute(
       path: '/admin/deliveries',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Suivi retraits',
-          icon: Icons.qr_code_scanner,
-        );
+        return const AdminDashboardPage();
       },
     ),
 
     GoRoute(
       path: '/admin/revenue',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(title: 'Revenus', icon: Icons.euro);
+        return const AdminDashboardPage();
       },
     ),
 
     GoRoute(
       path: '/admin/partner-payments',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Paiements partenaires',
-          icon: Icons.payments_outlined,
-        );
+        return const AdminPartnersPage();
       },
     ),
 
     GoRoute(
       path: '/admin/settings',
       builder: (BuildContext context, GoRouterState state) {
-        return const AdminPlaceholderPage(
-          title: 'Paramètres admin',
-          icon: Icons.settings_outlined,
-        );
+        return const AdminDashboardPage();
       },
     ),
 

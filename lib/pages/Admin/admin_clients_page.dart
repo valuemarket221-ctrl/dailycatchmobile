@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/admin_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 
 /// Admin Clients Page - Clone TGTG Style
@@ -18,6 +20,16 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   final TextEditingController _searchController = TextEditingController();
   int _currentPage = 0;
   final int _itemsPerPage = 10;
+  final AdminApiService _adminApiService = AdminApiService();
+  var _clients = <Map<String, dynamic>>[];
+  var _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClients();
+  }
 
   @override
   void dispose() {
@@ -25,30 +37,45 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     super.dispose();
   }
 
-  // Mock data for clients
-  final List<Map<String, dynamic>> _clients = List.generate(
-    25,
-    (index) => {
-      'id': 'USR${index + 1}',
-      'name': 'Client ${index + 1}',
-      'email': 'client${index + 1}@example.com',
-      'phone': '+221 77${index}00123$index',
-      'status': index % 5 == 0 ? 'inactive' : 'active',
-      'ordersCount': index * 3,
-      'totalSpent': (index * 3 * 15.50),
-      'joinedDate': DateTime.now().subtract(Duration(days: index * 10)),
-      'lastOrder': DateTime.now().subtract(Duration(days: index)),
-    },
-  );
+  Future<void> _loadClients() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final clients = await _adminApiService.getUsers(
+        role: 'client',
+        limit: 200,
+      );
+      if (!mounted) return;
+      setState(() {
+        _clients = clients;
+        _currentPage = 0;
+        _isLoading = false;
+      });
+    } on AdminApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.message;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'clients_unavailable';
+        _isLoading = false;
+      });
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredClients {
     var filtered = _clients;
 
     // Filter by tab
     if (_selectedTab == 1) {
-      filtered = filtered.where((c) => c['status'] == 'active').toList();
+      filtered = filtered.where((c) => c['active'] == true).toList();
     } else if (_selectedTab == 2) {
-      filtered = filtered.where((c) => c['status'] == 'inactive').toList();
+      filtered = filtered.where((c) => c['active'] != true).toList();
     }
 
     // Filter by search
@@ -58,9 +85,9 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
           filtered
               .where(
                 (c) =>
-                    c['name'].toString().toLowerCase().contains(query) ||
+                    _displayName(c).toLowerCase().contains(query) ||
                     c['email'].toString().toLowerCase().contains(query) ||
-                    c['phone'].toString().contains(query),
+                    (c['phone']?.toString() ?? '').contains(query),
               )
               .toList();
     }
@@ -69,22 +96,28 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   }
 
   List<Map<String, dynamic>> get _paginatedClients {
+    final filtered = _filteredClients;
+    if (filtered.isEmpty) return const [];
+
     final start = _currentPage * _itemsPerPage;
+    if (start >= filtered.length) {
+      return filtered.take(_itemsPerPage).toList();
+    }
     final end =
-        (start + _itemsPerPage) > _filteredClients.length
-            ? _filteredClients.length
+        (start + _itemsPerPage) > filtered.length
+            ? filtered.length
             : start + _itemsPerPage;
-    return _filteredClients.sublist(start, end);
+    return filtered.sublist(start, end);
   }
 
   int get _totalPages => (_filteredClients.length / _itemsPerPage).ceil();
 
-  Color _getStatusColor(String status) {
-    return status == 'active' ? AppColors.greenTGTG : AppTheme.errorColor;
+  Color _getStatusColor(bool active) {
+    return active ? AppColors.greenTGTG : AppTheme.errorColor;
   }
 
-  String _getStatusText(String status) {
-    return status == 'active' ? 'Actif' : 'Inactif';
+  String _getStatusText(bool active) {
+    return active ? 'Actif' : 'Inactif';
   }
 
   @override
@@ -140,7 +173,10 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-              onChanged: (value) => setState(() {}),
+              onChanged:
+                  (value) => setState(() {
+                    _currentPage = 0;
+                  }),
             ),
           ),
           // Status tabs
@@ -177,14 +213,35 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
           const SizedBox(height: 8),
           // Clients list
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _paginatedClients.length,
-              itemBuilder: (context, index) {
-                final client = _paginatedClients[index];
-                return _buildClientCard(context, client);
-              },
-            ),
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _loadError != null
+                    ? _buildStateMessage(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Clients indisponibles',
+                      message: _loadError!,
+                      actionLabel: 'Réessayer',
+                      onAction: _loadClients,
+                    )
+                    : _filteredClients.isEmpty
+                    ? _buildStateMessage(
+                      icon: Icons.people_alt_outlined,
+                      title: 'Aucun client',
+                      message:
+                          'Aucun compte client ne correspond aux filtres actuels.',
+                    )
+                    : RefreshIndicator(
+                      onRefresh: _loadClients,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _paginatedClients.length,
+                        itemBuilder: (context, index) {
+                          final client = _paginatedClients[index];
+                          return _buildClientCard(context, client);
+                        },
+                      ),
+                    ),
           ),
           // Pagination
           if (_totalPages > 1) _buildPagination(),
@@ -246,7 +303,11 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   Widget _buildTab(String label, int index) {
     final isSelected = _selectedTab == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
+      onTap:
+          () => setState(() {
+            _selectedTab = index;
+            _currentPage = 0;
+          }),
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -270,6 +331,9 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
   }
 
   Widget _buildClientCard(BuildContext context, Map<String, dynamic> client) {
+    final active = client['active'] == true;
+    final name = _displayName(client);
+    final createdAt = _date(client['createdAt']);
     return GestureDetector(
       onTap: () => context.go('/admin/clients/${client['id']}'),
       child: Container(
@@ -295,7 +359,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                   ),
                   child: Center(
                     child: Text(
-                      client['name'][0],
+                      name[0].toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -313,7 +377,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            client['name'] as String,
+                            name,
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -328,18 +392,16 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                             ),
                             decoration: BoxDecoration(
                               color: _getStatusColor(
-                                client['status'] as String,
+                                active,
                               ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _getStatusText(client['status'] as String),
+                              _getStatusText(active),
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: _getStatusColor(
-                                  client['status'] as String,
-                                ),
+                                color: _getStatusColor(active),
                               ),
                             ),
                           ),
@@ -366,25 +428,27 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
               children: [
                 Expanded(
                   child: _buildStat(
-                    Icons.shopping_bag,
-                    '${client['ordersCount']}',
-                    'Paniers',
+                    Icons.badge_outlined,
+                    client['id']?.toString() ?? '-',
+                    'Identifiant',
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildStat(
-                    Icons.euro,
-                    '${(client['totalSpent'] as double).toStringAsFixed(0)}€',
-                    'Dépensé',
+                    Icons.phone_outlined,
+                    client['phone']?.toString().isNotEmpty == true
+                        ? client['phone'].toString()
+                        : '-',
+                    'Téléphone',
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildStat(
-                    Icons.access_time,
-                    _getDaysAgo(client['lastOrder'] as DateTime),
-                    'Dernier retrait',
+                    Icons.calendar_today_outlined,
+                    createdAt == null ? '-' : _getDaysAgo(createdAt),
+                    'Inscrit',
                   ),
                 ),
               ],
@@ -436,6 +500,59 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     } else {
       return '${diff.inMinutes}m';
     }
+  }
+
+  String _displayName(Map<String, dynamic> client) {
+    final displayName = client['displayName']?.toString().trim();
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    final email = client['email']?.toString().trim();
+    if (email != null && email.isNotEmpty) return email;
+    return 'Client DailyCatch';
+  }
+
+  DateTime? _date(Object? value) {
+    final text = value?.toString();
+    if (text == null || text.isEmpty) return null;
+    return DateTime.tryParse(text);
+  }
+
+  Widget _buildStateMessage({
+    required IconData icon,
+    required String title,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 42, color: AppColors.blueBic),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.blueBic,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 14),
+              TextButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildPagination() {
@@ -497,7 +614,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
           ListTile(
             leading: const Icon(Icons.people, color: AppColors.blueBic),
             title: Text('Clients', style: GoogleFonts.poppins()),
-            onTap: () => context.pop(),
+            onTap: () => safePop(context),
           ),
           const Divider(),
           ListTile(

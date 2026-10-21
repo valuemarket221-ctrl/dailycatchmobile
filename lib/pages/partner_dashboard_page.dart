@@ -9,6 +9,7 @@ import 'package:myapp/pages/partner/orders_page.dart';
 import 'package:myapp/pages/partner/schedules_page.dart';
 import 'package:myapp/pages/partner/analytics_page.dart';
 import 'package:myapp/services/partner_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
 
 class PartnerDashboardPage extends StatefulWidget {
   const PartnerDashboardPage({super.key});
@@ -224,7 +225,7 @@ class _DashboardContent extends StatefulWidget {
 }
 
 class _DashboardContentState extends State<_DashboardContent> {
-  static const _storeId = 'store_port';
+  static const _fallbackStoreId = 'store_port';
   final PartnerApiService _partnerApiService = PartnerApiService();
   bool _isLoading = true;
   String? _loadError;
@@ -239,9 +240,10 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Future<void> _loadDashboard() async {
     try {
+      final storeId = await _resolveStoreId();
       final results = await Future.wait([
-        _partnerApiService.getStoreOffers(_storeId),
-        _partnerApiService.getStoreReservations(_storeId),
+        _partnerApiService.getStoreOffers(storeId),
+        _partnerApiService.getStoreReservations(storeId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -253,12 +255,31 @@ class _DashboardContentState extends State<_DashboardContent> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _offers = _fallbackOffers;
-        _reservations = _fallbackReservations;
-        _loadError = 'Backend indisponible: données de démonstration affichées';
+        _offers =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackOffers
+                : const <Map<String, dynamic>>[];
+        _reservations =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? _fallbackReservations
+                : const <Map<String, dynamic>>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? 'Backend indisponible: données de démonstration affichées'
+                : 'Données vendeur indisponibles.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<String> _resolveStoreId() async {
+    final storeContext = await _partnerApiService.getMyStoreContext();
+    if (storeContext != null) return storeContext.storeId;
+    if (ApiEnvironment.isDemoFallbackAllowed) return _fallbackStoreId;
+    throw const PartnerApiException(
+      statusCode: 404,
+      message: 'partner_profile_missing',
+    );
   }
 
   int get _activeOffers =>

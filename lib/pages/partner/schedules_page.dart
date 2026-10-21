@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:myapp/providers/partner_provider.dart' show StoreHours;
+import 'package:myapp/services/partner_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
-import 'package:myapp/providers/partner_provider.dart';
 
 class PartnerSchedulesPage extends StatefulWidget {
   const PartnerSchedulesPage({super.key});
@@ -12,64 +12,162 @@ class PartnerSchedulesPage extends StatefulWidget {
 }
 
 class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
-  final List<_SpecialDay> _specialDays = [
-    const _SpecialDay('Fête nationale', '14 Juillet - Fermé'),
-  ];
+  final PartnerApiService _partnerApiService = PartnerApiService();
+  final List<_SpecialDay> _specialDays = [];
+  List<StoreHours> _schedule = _defaultSchedule();
+  Map<String, dynamic>? _profile;
+  var _isLoading = true;
+  var _isSaving = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchedule();
+  }
+
+  Future<void> _loadSchedule() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final profile = await _partnerApiService.getMyProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _schedule = _scheduleFromProfile(profile);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'Horaires indisponibles pour le moment.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveHours(StoreHours updated) async {
+    final previousSchedule =
+        _schedule.map((hours) => hours.copyWith()).toList();
+    setState(() {
+      _schedule =
+          _schedule
+              .map((hours) => hours.day == updated.day ? updated : hours)
+              .toList();
+      _isSaving = true;
+    });
+
+    try {
+      final profile = await _partnerApiService.saveMyProfile(
+        PartnerProfileRequest(
+          storeId: _readProfileString('storeId', fallback: 'store_port'),
+          storeName: _readProfileString('storeName', fallback: 'Mon commerce'),
+          ownerName: _readNullableProfileString('ownerName'),
+          commerceType: _readProfileString(
+            'commerceType',
+            fallback: 'fishmonger',
+          ),
+          address: _readNullableProfileString('address'),
+          city: _readNullableProfileString('city'),
+          postalCode: _readNullableProfileString('postalCode'),
+          phone: _readNullableProfileString('phone'),
+          email: _readNullableProfileString('email'),
+          description: _readNullableProfileString('description'),
+          latitude: _readProfileDouble('latitude'),
+          longitude: _readProfileDouble('longitude'),
+          openingHours: _openingHoursPayload(_schedule),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _isSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Horaire enregistré.'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _schedule = previousSchedule;
+        _isSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enregistrement impossible pour le moment.'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PartnerProvider>(
-      builder: (context, provider, child) {
-        return Material(
-          color: AppTheme.mutedSurface,
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                color: Colors.white,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Créneaux de retrait',
-                        style: AppTextStyles.headingM,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppTheme.primaryColor,
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWeeklySchedule(context, provider),
-                      const SizedBox(height: 32),
-                      _buildSpecialHours(context),
-                    ],
+    return Material(
+      color: AppTheme.mutedSurface,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Créneaux de retrait',
+                    style: AppTextStyles.headingM,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppTheme.primaryColor,
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+          Expanded(
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _loadError != null
+                    ? _buildStateMessage(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Horaires indisponibles',
+                      message: _loadError!,
+                      actionLabel: 'Réessayer',
+                      onAction: _loadSchedule,
+                    )
+                    : RefreshIndicator(
+                      onRefresh: _loadSchedule,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildWeeklySchedule(context),
+                            const SizedBox(height: 32),
+                            _buildSpecialHours(context),
+                          ],
+                        ),
+                      ),
+                    ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -104,7 +202,7 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
                                   labelText: 'Début retrait',
                                   border: OutlineInputBorder(),
                                 ),
-                                keyboardType: TextInputType.number,
+                                keyboardType: TextInputType.datetime,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -115,7 +213,7 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
                                   labelText: 'Fin retrait',
                                   border: OutlineInputBorder(),
                                 ),
-                                keyboardType: TextInputType.number,
+                                keyboardType: TextInputType.datetime,
                               ),
                             ),
                           ],
@@ -132,24 +230,19 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                       ),
-                      onPressed: () {
-                        final updated = StoreHours(
-                          day: hours.day,
-                          openTime: openController.text,
-                          closeTime: closeController.text,
-                          isOpen: isOpen,
-                        );
-                        context.read<PartnerProvider>().updateStoreHours(
-                          updated,
-                        );
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Horaire mis à jour!'),
-                            backgroundColor: Color(0xFF10B981),
-                          ),
-                        );
-                      },
+                      onPressed:
+                          _isSaving
+                              ? null
+                              : () {
+                                final updated = StoreHours(
+                                  day: hours.day,
+                                  openTime: openController.text.trim(),
+                                  closeTime: closeController.text.trim(),
+                                  isOpen: isOpen,
+                                );
+                                Navigator.pop(ctx);
+                                _saveHours(updated);
+                              },
                       child: const Text('Enregistrer'),
                     ),
                   ],
@@ -158,9 +251,7 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
     );
   }
 
-  Widget _buildWeeklySchedule(BuildContext context, PartnerProvider provider) {
-    final schedule = provider.storeHours;
-
+  Widget _buildWeeklySchedule(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -174,30 +265,41 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
         children: [
           Row(
             children: [
-              Text('Créneaux hebdomadaires', style: AppTextStyles.headingS),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              Expanded(
                 child: Text(
-                  'Retrait actif aujourd\'hui',
-                  style: AppTextStyles.bodyS.copyWith(
-                    color: const Color(0xFF10B981),
-                  ),
+                  'Créneaux hebdomadaires',
+                  style: AppTextStyles.headingS,
                 ),
               ),
+              if (_isSaving)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Synchronisé',
+                    style: AppTextStyles.bodyS.copyWith(
+                      color: const Color(0xFF10B981),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 24),
           ...List.generate(
-            schedule.length,
-            (i) => _buildDayRow(context, schedule[i], i),
+            _schedule.length,
+            (i) => _buildDayRow(context, _schedule[i], i),
           ),
         ],
       ),
@@ -249,40 +351,14 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            hours.openTime,
-                            style: AppTextStyles.bodyM,
-                          ),
-                        ),
+                        _timePill(hours.openTime),
                         Text(
                           '-',
                           style: AppTextStyles.bodyM.copyWith(
                             color: Colors.grey[400],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            hours.closeTime,
-                            style: AppTextStyles.bodyM,
-                          ),
-                        ),
+                        _timePill(hours.closeTime),
                       ],
                     )
                     : Text(
@@ -301,6 +377,17 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
     );
   }
 
+  Widget _timePill(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(value, style: AppTextStyles.bodyM),
+    );
+  }
+
   Widget _buildSpecialHours(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -315,8 +402,12 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
         children: [
           Row(
             children: [
-              Text('Créneaux exceptionnels', style: AppTextStyles.headingS),
-              const Spacer(),
+              Expanded(
+                child: Text(
+                  'Créneaux exceptionnels',
+                  style: AppTextStyles.headingS,
+                ),
+              ),
               OutlinedButton.icon(
                 onPressed: () => _showAddSpecialDay(context),
                 icon: const Icon(Icons.add, size: 18),
@@ -436,6 +527,122 @@ class _PartnerSchedulesPageState extends State<PartnerSchedulesPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Créneau supprimé')));
+  }
+
+  Widget _buildStateMessage({
+    required IconData icon,
+    required String title,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 52, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text(title, style: AppTextStyles.headingS),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: AppTextStyles.bodyM.copyWith(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static List<StoreHours> _defaultSchedule() => [
+    StoreHours(day: 'Lundi', openTime: '08:00', closeTime: '20:00'),
+    StoreHours(day: 'Mardi', openTime: '08:00', closeTime: '20:00'),
+    StoreHours(day: 'Mercredi', openTime: '08:00', closeTime: '20:00'),
+    StoreHours(day: 'Jeudi', openTime: '08:00', closeTime: '20:00'),
+    StoreHours(day: 'Vendredi', openTime: '08:00', closeTime: '22:00'),
+    StoreHours(day: 'Samedi', openTime: '08:00', closeTime: '22:00'),
+    StoreHours(day: 'Dimanche', openTime: '08:00', closeTime: '18:00'),
+  ];
+
+  static List<StoreHours> _scheduleFromProfile(Map<String, dynamic>? profile) {
+    final defaults = _defaultSchedule();
+    final openingHours = profile?['openingHours'];
+    if (openingHours is! Map || openingHours.isEmpty) return defaults;
+
+    return defaults.map((hours) {
+      final raw = openingHours[hours.day] ?? openingHours[_shortDay(hours.day)];
+      if (raw == null) return hours;
+      return _parseHoursValue(hours, raw.toString());
+    }).toList();
+  }
+
+  static StoreHours _parseHoursValue(StoreHours fallback, String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty || normalized.toLowerCase() == 'fermé') {
+      return fallback.copyWith(isOpen: false);
+    }
+
+    final parts =
+        normalized
+            .replaceAll('–', '-')
+            .split('-')
+            .map((part) => part.trim())
+            .where((part) => part.isNotEmpty)
+            .toList();
+    if (parts.length < 2) return fallback;
+    return fallback.copyWith(openTime: parts[0], closeTime: parts[1]);
+  }
+
+  static String _shortDay(String day) {
+    switch (day) {
+      case 'Lundi':
+        return 'Lun';
+      case 'Mardi':
+        return 'Mar';
+      case 'Mercredi':
+        return 'Mer';
+      case 'Jeudi':
+        return 'Jeu';
+      case 'Vendredi':
+        return 'Ven';
+      case 'Samedi':
+        return 'Sam';
+      case 'Dimanche':
+        return 'Dim';
+      default:
+        return day;
+    }
+  }
+
+  static Map<String, String> _openingHoursPayload(List<StoreHours> schedule) {
+    return {
+      for (final hours in schedule)
+        hours.day:
+            hours.isOpen ? '${hours.openTime} - ${hours.closeTime}' : 'Fermé',
+    };
+  }
+
+  String _readProfileString(String field, {required String fallback}) {
+    final value = _profile?[field]?.toString().trim() ?? '';
+    return value.isEmpty ? fallback : value;
+  }
+
+  String? _readNullableProfileString(String field) {
+    final value = _profile?[field]?.toString().trim() ?? '';
+    return value.isEmpty ? null : value;
+  }
+
+  double? _readProfileDouble(String field) {
+    final value = _profile?[field];
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 }
 

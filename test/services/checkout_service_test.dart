@@ -18,6 +18,8 @@ void main() {
           'status': 'pending_payment',
           'amount': 6000,
           'currency': 'XOF',
+          'deliveryMode': 'pickup',
+          'deliveryFee': 0,
           'pickupCode': '5287',
         }),
         201,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 
@@ -47,7 +48,7 @@ class PickupPage extends StatelessWidget {
                 children: [
                   if (context.canPop())
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => safePop(context),
                       icon: const Icon(
                         Icons.arrow_back,
                         color: AppColors.blueBic,

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/models/store_model.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 
 class StoreCard extends StatelessWidget {
   const StoreCard({super.key, required this.store, this.onTap});
@@ -69,16 +70,13 @@ class _ImageBlock extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              store.image,
+            AppRemoteImage(
+              path: store.image,
+              width: 96,
+              height: 96,
               fit: BoxFit.cover,
               cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
               filterQuality: FilterQuality.medium,
-              errorBuilder:
-                  (context, error, stackTrace) => Container(
-                    color: const Color(0xFFEFF3EF),
-                    child: const Icon(Icons.image_not_supported_outlined),
-                  ),
             ),
             Positioned(
               left: 6,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/demo/demo_mode.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -44,7 +45,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   }
 
   Future<void> _validateQRCode(String data) async {
-    _scannerController.stop();
+    if (!DemoMode.enabled) _scannerController.stop();
     setState(() {
       _scannedData = data;
       _hasScanned = true;
@@ -120,7 +121,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _validationMessage = '';
       _validatedOrder = const {};
     });
-    _scannerController.start();
+    if (!DemoMode.enabled) _scannerController.start();
   }
 
   @override
@@ -138,11 +139,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
         foregroundColor: Colors.white,
         centerTitle: true,
         actions: [
-          IconButton(
-            tooltip: 'Lampe',
-            icon: const Icon(Icons.flashlight_on),
-            onPressed: () => _scannerController.toggleTorch(),
-          ),
+          if (!DemoMode.enabled)
+            IconButton(
+              tooltip: 'Lampe',
+              icon: const Icon(Icons.flashlight_on),
+              onPressed: () => _scannerController.toggleTorch(),
+            ),
         ],
       ),
       body: Column(
@@ -192,13 +194,39 @@ class _QRScannerPageState extends State<QRScannerPage> {
                             ? _buildScanResult()
                             : ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: MobileScanner(
-                                controller: _scannerController,
-                                onDetect: _handleBarcodeCapture,
-                                errorBuilder:
-                                    (context, error) =>
-                                        _buildCameraError(error),
-                              ),
+                              child:
+                                  DemoMode.enabled
+                                      ? Center(
+                                        child: FilledButton.icon(
+                                          icon: const Icon(
+                                            Icons.qr_code_scanner,
+                                          ),
+                                          label: const Text('Simuler un scan'),
+                                          onPressed: () async {
+                                            final orders =
+                                                await _paymentApiService
+                                                    .getMyOrders();
+                                            final order =
+                                                orders
+                                                    .where(
+                                                      (o) => o.status == 'paid',
+                                                    )
+                                                    .firstOrNull;
+                                            if (order != null && mounted) {
+                                              await _validateQRCode(
+                                                '${order.id}|${order.pickupCode}',
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      )
+                                      : MobileScanner(
+                                        controller: _scannerController,
+                                        onDetect: _handleBarcodeCapture,
+                                        errorBuilder:
+                                            (context, error) =>
+                                                _buildCameraError(error),
+                                      ),
                             ),
                   ),
                 ),

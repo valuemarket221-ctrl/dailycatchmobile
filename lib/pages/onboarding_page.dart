@@ -67,7 +67,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  void _finish() => context.go('/login');
+  void _finish() => context.go('/permission-location');
 
   @override
   void dispose() {

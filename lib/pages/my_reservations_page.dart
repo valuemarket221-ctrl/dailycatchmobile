@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/payment_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/utils/formatters.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -24,7 +27,12 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
   String? _loadError;
 
   // Données fictives pour les réservations
-  List<Reservation> _reservations = [
+  List<Reservation> _reservations =
+      ApiEnvironment.isDemoFallbackAllowed
+          ? List<Reservation>.of(_fallbackReservations)
+          : <Reservation>[];
+
+  static final _fallbackReservations = [
     Reservation(
       id: 'RES001',
       productName: 'Sacs de crevettes grises',
@@ -36,6 +44,8 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
       status: ReservationStatus.active,
       qrCodeData: 'RES001|DailyCatch|4500',
       deliveryMode: 'pickup',
+      pickupCode: 'RES001',
+      imagePath: 'assets/images/crevette.jpg',
     ),
     Reservation(
       id: 'RES002',
@@ -48,6 +58,8 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
       status: ReservationStatus.active,
       qrCodeData: 'RES002|DailyCatch|7500',
       deliveryMode: 'pickup',
+      pickupCode: 'RES002',
+      imagePath: 'assets/images/langoustines.jpg',
     ),
     Reservation(
       id: 'RES003',
@@ -60,6 +72,8 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
       status: ReservationStatus.completed,
       qrCodeData: 'RES003|DailyCatch|3500',
       deliveryMode: 'pickup',
+      pickupCode: 'RES003',
+      imagePath: 'assets/images/saumon.jpg',
     ),
   ];
 
@@ -70,18 +84,31 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
   }
 
   Future<void> _loadReservations() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
     try {
       final orders = await _paymentApiService.getMyOrders();
       if (!mounted) return;
       setState(() {
-        _reservations = orders.map(_reservationFromOrder).toList();
+        _reservations = orders.map(reservationFromOrderSummary).toList();
         _loadError = null;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = 'Backend indisponible: réservations de démonstration';
+        _reservations =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? List<Reservation>.of(_fallbackReservations)
+                : <Reservation>[];
+        final message = ApiErrorMessages.fromObject(error);
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? '$message Réservations de démonstration affichées.'
+                : message;
         _isLoading = false;
       });
     }
@@ -153,7 +180,13 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
           // Liste des réservations
           Expanded(
             child:
-                _filteredReservations.isEmpty
+                _isLoading
+                    ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.blueBic,
+                      ),
+                    )
+                    : _filteredReservations.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -311,287 +344,159 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       elevation: 4,
-      child: Column(
-        children: [
-          // En-tête avec statut
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color:
-                  isActive
-                      ? AppColors.blueBic.withValues(alpha: 0.1)
-                      : Colors.grey.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Réservation #${reservation.id}',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      color: isActive ? AppColors.blueBic : Colors.grey,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+      child: InkWell(
+        onTap: () => context.push('/reservation-detail', extra: reservation),
+        child: Column(
+          children: [
+            // En-tête avec statut
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color:
+                    isActive
+                        ? AppColors.blueBic.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
                 ),
-                const SizedBox(width: 8),
-                Flexible(
-                  flex: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isActive ? Colors.green : Colors.grey,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
                     child: Text(
-                      isActive ? 'À récupérer' : 'Terminé',
+                      'Réservation #${reservation.id}',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: isActive ? AppColors.blueBic : Colors.grey,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Contenu
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Produit
-                Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppColors.yellowColor.withValues(alpha: 0.2),
+                        color: isActive ? Colors.green : Colors.grey,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.shopping_bag,
-                        color: AppColors.blueBic,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            reservation.productName,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            reservation.partnerName,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Prix
-                Row(
-                  children: [
-                    Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.end,
-                        children: [
-                          Text(
-                            AppFormatters.formatCfa(reservation.originalPrice),
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                          Text(
-                            AppFormatters.formatCfa(reservation.price),
-                            style: GoogleFonts.poppins(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.blueBic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      flex: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '-${_discountPercent(reservation)}%',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // Horaire de retrait
-                Row(
-                  children: [
-                    const Icon(Icons.access_time, size: 18, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Text(
-                      isActive
-                          ? '${reservation.isDelivery ? 'Livraison prévue' : 'Récupérez'} avant ${_formatDate(reservation.pickupDate)}'
-                          : '${reservation.isDelivery ? 'Livré' : 'Récupéré'} le ${_formatDateFull(reservation.pickupDate)}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: isActive ? Colors.red : Colors.grey[600],
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Adresse
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on,
-                      size: 18,
-                      color: AppColors.blueBic,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
                       child: Text(
-                        reservation.partnerAddress,
+                        isActive ? 'À récupérer' : 'Terminé',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: AppColors.blueBic,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-
-                // Compte à rebours pour actifs
-                if (isActive && timeRemaining.inHours > 0) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.timer, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Plus que ${timeRemaining.inHours}h ${timeRemaining.inMinutes % 60}min',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ],
+              ),
+            ),
 
-                const SizedBox(height: 16),
+            // Contenu
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Produit
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: AppRemoteImage(
+                          path: reservation.imagePath,
+                          width: 60,
+                          height: 60,
+                          cacheWidth: 160,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              reservation.productName,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              reservation.partnerName,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
-                // Bouton QR Code pour actifs
-                if (isActive)
+                  const SizedBox(height: 16),
+
+                  // Prix
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => QRCodePage(reservation: reservation),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.end,
+                          children: [
+                            Text(
+                              AppFormatters.formatCfa(
+                                reservation.originalPrice,
                               ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.qr_code_2,
-                            color: Colors.black,
-                          ),
-                          label: Text(
-                            'QR Code',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                                decoration: TextDecoration.lineThrough,
+                              ),
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.yellowColor,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                            Text(
+                              AppFormatters.formatCfa(reservation.price),
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.blueBic,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _cancelReservation(reservation),
-                          icon: const Icon(Icons.close),
-                          label: Text(
-                            'Annuler',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        flex: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '-${_discountPercent(reservation)}%',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -599,35 +504,168 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
                     ],
                   ),
 
-                // Bouton évaluer pour terminés
-                if (!isActive)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        context.go('/rate-review');
-                      },
-                      icon: const Icon(Icons.rate_review, color: Colors.white),
-                      label: Text(
-                        'Évaluer',
+                  const SizedBox(height: 12),
+
+                  // Horaire de retrait
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isActive
+                            ? '${reservation.isDelivery ? 'Livraison prévue' : 'Récupérez'} avant ${_formatDate(reservation.pickupDate)}'
+                            : '${reservation.isDelivery ? 'Livré' : 'Récupéré'} le ${_formatDateFull(reservation.pickupDate)}',
                         style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          fontSize: 14,
+                          color: isActive ? Colors.red : Colors.grey[600],
+                          fontWeight:
+                              isActive ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.greenTGTG,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    ],
+                  ),
+
+                  // Adresse
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        size: 18,
+                        color: AppColors.blueBic,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          reservation.partnerAddress,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: AppColors.blueBic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Compte à rebours pour actifs
+                  if (isActive && timeRemaining.inHours > 0) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.timer, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Plus que ${timeRemaining.inHours}h ${timeRemaining.inMinutes % 60}min',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // Bouton QR Code pour actifs
+                  if (isActive)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                () => context.push(
+                                  '/withdrawal-code',
+                                  extra: reservation,
+                                ),
+                            icon: const Icon(
+                              Icons.qr_code_2,
+                              color: Colors.black,
+                            ),
+                            label: Text(
+                              'QR Code',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.yellowColor,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _cancelReservation(reservation),
+                            icon: const Icon(Icons.close),
+                            label: Text(
+                              'Annuler',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  // Bouton évaluer pour terminés
+                  if (!isActive)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.go('/rate-review');
+                        },
+                        icon: const Icon(
+                          Icons.rate_review,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Évaluer',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.greenTGTG,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -735,41 +773,79 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
       );
     }
   }
+}
 
-  Reservation _reservationFromOrder(OrderSummary order) {
-    final firstItem = order.items.isEmpty ? null : order.items.first;
-    final quantity = (firstItem?['quantity'] as num?)?.toInt() ?? 1;
-    final unitAmount =
-        ((firstItem?['unitAmount'] as num?)?.toInt() ?? order.amount);
-    final name = firstItem?['name'] as String? ?? 'Panier surprise';
-    final storeId = firstItem?['storeId'] as String? ?? 'Commerce';
-    return Reservation(
-      id: order.id,
-      productName: quantity > 1 ? '$quantity x $name' : name,
-      partnerName: storeId,
-      partnerAddress: 'Adresse du commerce partenaire',
-      price: order.amount.toDouble(),
-      originalPrice: (unitAmount * quantity * 2.5),
-      pickupDate: order.createdAt.add(const Duration(hours: 4)),
-      status: _statusFromOrder(order.status),
-      qrCodeData: '${order.id}|${order.pickupCode}',
-      deliveryMode: order.deliveryMode,
-    );
+Reservation reservationFromOrderSummary(OrderSummary order) {
+  final firstItem = order.items.isEmpty ? null : order.items.first;
+  final quantity = (firstItem?['quantity'] as num?)?.toInt() ?? 1;
+  final unitAmount =
+      ((firstItem?['unitAmount'] as num?)?.toInt() ?? order.amount);
+  final originalUnitAmount =
+      (firstItem?['originalUnitAmount'] as num?)?.toInt();
+  final name = firstItem?['name'] as String? ?? 'Panier surprise';
+  final storeName =
+      (firstItem?['storeName'] as String?) ??
+      (firstItem?['storeId'] as String?) ??
+      'Commerce DailyCatch';
+  final mediaUrls =
+      (firstItem?['mediaUrls'] as List<dynamic>? ?? const [])
+          .map((url) => url.toString())
+          .where((url) => url.trim().isNotEmpty)
+          .toList();
+
+  return Reservation(
+    id: order.id,
+    productName: quantity > 1 ? '$quantity x $name' : name,
+    partnerName: storeName,
+    partnerAddress: _storeAddressFor(storeName),
+    price: order.amount.toDouble(),
+    originalPrice:
+        ((originalUnitAmount ?? (unitAmount * 2)) * quantity).toDouble(),
+    pickupDate: _pickupDateFor(order),
+    status: _statusFromOrder(order.status),
+    qrCodeData: '${order.id}|${order.pickupCode}',
+    pickupCode: order.pickupCode,
+    deliveryMode: order.deliveryMode,
+    imagePath:
+        mediaUrls.isNotEmpty
+            ? mediaUrls.first
+            : 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
+  );
+}
+
+ReservationStatus _statusFromOrder(String status) {
+  switch (status) {
+    case 'picked_up':
+      return ReservationStatus.completed;
+    case 'canceled':
+    case 'refund_pending':
+    case 'refunded':
+    case 'payment_failed':
+      return ReservationStatus.cancelled;
+    default:
+      return ReservationStatus.active;
+  }
+}
+
+DateTime _pickupDateFor(OrderSummary order) {
+  final slot = order.pickupSlot;
+  if (slot == null || slot.trim().isEmpty) {
+    return order.createdAt.add(const Duration(hours: 4));
   }
 
-  ReservationStatus _statusFromOrder(String status) {
-    switch (status) {
-      case 'picked_up':
-        return ReservationStatus.completed;
-      case 'canceled':
-      case 'refund_pending':
-      case 'refunded':
-      case 'payment_failed':
-        return ReservationStatus.cancelled;
-      default:
-        return ReservationStatus.active;
-    }
+  final parsed = DateTime.tryParse(slot);
+  if (parsed != null) return parsed;
+
+  return order.createdAt.add(const Duration(hours: 4));
+}
+
+String _storeAddressFor(String storeName) {
+  final normalized = storeName.toLowerCase();
+  if (normalized.contains('yoff')) return 'Marché de Yoff, Dakar';
+  if (normalized.contains('soumbédioune') || normalized.contains('soumbed')) {
+    return 'Soumbédioune, Dakar';
   }
+  return 'Dakar, Sénégal';
 }
 
 /// Modèle de réservation
@@ -784,6 +860,8 @@ class Reservation {
   final ReservationStatus status;
   final String qrCodeData;
   final String deliveryMode;
+  final String pickupCode;
+  final String imagePath;
 
   bool get isDelivery => deliveryMode == 'delivery';
 
@@ -797,6 +875,8 @@ class Reservation {
     required this.pickupDate,
     required this.status,
     required this.qrCodeData,
+    this.pickupCode = '',
+    this.imagePath = 'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
     this.deliveryMode = 'pickup',
   });
 
@@ -811,6 +891,8 @@ class Reservation {
     ReservationStatus? status,
     String? qrCodeData,
     String? deliveryMode,
+    String? pickupCode,
+    String? imagePath,
   }) {
     return Reservation(
       id: id ?? this.id,
@@ -822,6 +904,8 @@ class Reservation {
       pickupDate: pickupDate ?? this.pickupDate,
       status: status ?? this.status,
       qrCodeData: qrCodeData ?? this.qrCodeData,
+      pickupCode: pickupCode ?? this.pickupCode,
+      imagePath: imagePath ?? this.imagePath,
       deliveryMode: deliveryMode ?? this.deliveryMode,
     );
   }

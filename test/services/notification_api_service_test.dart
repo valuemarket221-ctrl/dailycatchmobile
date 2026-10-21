@@ -21,6 +21,7 @@ void main() {
               'title': 'Commande prete',
               'body': 'Votre panier est pret.',
               'status': 'queued',
+              'deliveryAttempts': 0,
               'createdAt': '2026-08-16T16:30:00.000Z',
             },
           ],
@@ -70,6 +71,68 @@ void main() {
     expect(capturedRequest.method, 'POST');
     expect(capturedRequest.url.path, '/api/v1/notifications/notif_1/read');
     expect(readAt.toUtc().toIso8601String(), '2026-08-16T16:35:00.000Z');
+  });
+
+  test('marks all notifications as read', () async {
+    late http.Request capturedRequest;
+    final client = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response('{"updatedCount":4}', 200);
+    });
+
+    final service = NotificationApiService(
+      api: BackendApiClient(
+        client: client,
+        baseUrl: 'http://127.0.0.1:8080',
+        tokenProvider: () async => 'client-token',
+      ),
+    );
+
+    final updatedCount = await service.markAllAsRead();
+
+    expect(capturedRequest.method, 'POST');
+    expect(capturedRequest.url.path, '/api/v1/notifications/read-all');
+    expect(updatedCount, 4);
+  });
+
+  test('rejects malformed notifications', () async {
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'notifications': [
+            {
+              'id': 'notif_1',
+              'type': 'order_ready',
+              'title': 'Commande prete',
+              'body': 'Votre panier est pret.',
+              'status': 'queued',
+              'createdAt': 'not-a-date',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final service = NotificationApiService(
+      api: BackendApiClient(
+        client: client,
+        tokenProvider: () async => 'client-token',
+      ),
+    );
+
+    expect(
+      service.getMyNotifications,
+      throwsA(
+        isA<NotificationApiException>()
+            .having((error) => error.statusCode, 'statusCode', 200)
+            .having(
+              (error) => error.message,
+              'message',
+              'invalid_backend_response',
+            ),
+      ),
+    );
   });
 
   test('normalizes backend errors', () async {

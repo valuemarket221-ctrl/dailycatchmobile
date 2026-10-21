@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/message_api_service.dart';
+import 'package:myapp/utils/api_environment.dart';
+import 'package:myapp/utils/api_error_messages.dart';
 import 'package:myapp/widgets/bottom_nav_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -16,7 +18,12 @@ class _MessagesPageState extends State<MessagesPage> {
   final MessageApiService _messageApiService = MessageApiService();
   var _isLoading = true;
   String? _loadError;
-  List<_ConversationListItem> _items = const [
+  List<_ConversationListItem> _items =
+      ApiEnvironment.isDemoFallbackAllowed
+          ? List<_ConversationListItem>.of(_fallbackItems)
+          : <_ConversationListItem>[];
+
+  static const _fallbackItems = [
     _ConversationListItem(
       title: 'Poissonnerie Yoff',
       message: 'Votre commande est prête !',
@@ -75,13 +82,27 @@ class _MessagesPageState extends State<MessagesPage> {
     } on MessageApiException catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = error.message;
+        _items =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? List<_ConversationListItem>.of(_fallbackItems)
+                : <_ConversationListItem>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? '${ApiErrorMessages.fromObject(error)} Messages de démonstration affichés.'
+                : ApiErrorMessages.fromObject(error);
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = 'messages_unavailable';
+        _items =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? List<_ConversationListItem>.of(_fallbackItems)
+                : <_ConversationListItem>[];
+        _loadError =
+            ApiEnvironment.isDemoFallbackAllowed
+                ? '${ApiErrorMessages.fromObject(error)} Messages de démonstration affichés.'
+                : ApiErrorMessages.fromObject(error);
         _isLoading = false;
       });
     }
@@ -118,6 +139,7 @@ class _MessagesPageState extends State<MessagesPage> {
                         ? const SizedBox.shrink(key: ValueKey('ready'))
                         : _MessagesNotice(
                           key: const ValueKey('notice'),
+                          message: _loadError!,
                           onRetry: _loadConversations,
                         ),
               ),
@@ -265,8 +287,13 @@ class _MessagesLoading extends StatelessWidget {
 }
 
 class _MessagesNotice extends StatelessWidget {
-  const _MessagesNotice({super.key, required this.onRetry});
+  const _MessagesNotice({
+    super.key,
+    required this.message,
+    required this.onRetry,
+  });
 
+  final String message;
   final VoidCallback onRetry;
 
   @override
@@ -287,9 +314,7 @@ class _MessagesNotice extends StatelessWidget {
             color: AppColors.blueBic,
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text('Messages hors ligne pour le moment.', style: _notice),
-          ),
+          Expanded(child: Text(message, style: _notice)),
           TextButton(onPressed: onRetry, child: Text('Réessayer', style: _link)),
         ],
       ),

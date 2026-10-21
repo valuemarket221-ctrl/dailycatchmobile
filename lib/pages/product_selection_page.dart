@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/styles/app_theme.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 
 /// Page Produit Simple Style TGTG - Fond blanc avec nom au milieu
 class ProductSelectionPage extends StatefulWidget {
@@ -37,7 +39,7 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: AppColors.blueBic),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
       ),
       body: SafeArea(
@@ -50,18 +52,11 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    product['image'] ?? '',
+                  AppRemoteImage(
+                    path: product['image'] ?? '',
+                    width: MediaQuery.sizeOf(context).width,
+                    height: MediaQuery.sizeOf(context).height,
                     fit: BoxFit.cover,
-                    errorBuilder:
-                        (c, e, s) => Container(
-                          color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.broken_image,
-                            size: 80,
-                            color: Colors.grey,
-                          ),
-                        ),
                   ),
                   // Badge temps restant
                   Positioned(
@@ -283,11 +278,12 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
     double price,
     int quantity,
   ) {
+    final parentContext = context;
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       backgroundColor: Colors.transparent,
       builder:
-          (context) => Container(
+          (sheetContext) => Container(
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -356,8 +352,8 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                       ),
                     ),
                     onPressed: () {
-                      context.pop(); // Fermer le bottom sheet
-                      context.pop(); // Retour à la page boutique
+                      Navigator.of(sheetContext).pop();
+                      safePop(parentContext);
                     },
                     child: Text(
                       'Voir plus de paniers',
@@ -372,8 +368,9 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () {
-                    context.pop(); // Fermer le bottom sheet
-                    context.push(
+                    Navigator.of(sheetContext).pop();
+                    if (!mounted) return;
+                    parentContext.push(
                       '/cart',
                       extra: {'produit': widget.product, 'quantity': quantity},
                     );

@@ -1,10 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:myapp/demo/demo_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/auth_api_service.dart';
+import 'package:myapp/services/backend_api_client.dart';
 import 'package:myapp/styles/app_theme.dart';
+import 'package:myapp/utils/api_error_messages.dart';
+import 'package:myapp/utils/local_auth_session.dart';
 import 'package:myapp/utils/validators.dart';
 
 class RegisterClientPage extends StatefulWidget {
@@ -47,30 +52,40 @@ class _RegisterClientPageState extends State<RegisterClientPage> {
 
     try {
       setState(() => _isLoading = true);
+      if (DemoMode.enabled) {
+        final route = await LocalAuthSession.registerDemo(
+          email: _emailController.text,
+          password: _passwordController.text,
+          name: _nameController.text,
+          role: 'client',
+        );
+        if (mounted) context.go(route);
+        return;
+      }
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
       await credential.user?.updateDisplayName(_nameController.text.trim());
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(credential.user!.uid)
-          .set({
-            'role': 'client',
-            'name': _nameController.text.trim(),
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
       await credential.user?.getIdToken(true);
+      final session = await AuthApiService().registerClient(
+        displayName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+      await LocalAuthSession.saveBackendSession(
+        user: session.user,
+        homeRoute: session.homeRoute,
+      );
       if (!mounted) return;
-      context.go('/home');
+      context.go(session.homeRoute);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showErrorSnackBar(_friendlyAuthError(e.code));
+    } on BackendApiException catch (e) {
+      if (!mounted) return;
+      _showErrorSnackBar(ApiErrorMessages.fromCode(e.code));
     } catch (_) {
       if (!mounted) return;
       _showErrorSnackBar('Erreur lors de l’inscription. Réessayez plus tard.');
@@ -159,7 +174,7 @@ class _RegisterClientPageState extends State<RegisterClientPage> {
                             onTap:
                                 () =>
                                     context.canPop()
-                                        ? context.pop()
+                                        ? safePop(context)
                                         : context.go('/role-selection'),
                           ),
                         ),

@@ -72,13 +72,13 @@ class CreateOrderResponse {
 
   factory CreateOrderResponse.fromJson(Map<String, dynamic> json) {
     return CreateOrderResponse(
-      orderId: json['orderId'] as String,
-      status: json['status'] as String,
-      amount: json['amount'] as int,
-      currency: json['currency'] as String,
-      deliveryMode: json['deliveryMode'] as String? ?? 'pickup',
-      deliveryFee: json['deliveryFee'] as int? ?? 0,
-      pickupCode: json['pickupCode'] as String?,
+      orderId: BackendApiClient.requireString(json, 'orderId'),
+      status: BackendApiClient.requireString(json, 'status'),
+      amount: BackendApiClient.requireInt(json, 'amount'),
+      currency: BackendApiClient.requireString(json, 'currency'),
+      deliveryMode: BackendApiClient.requireString(json, 'deliveryMode'),
+      deliveryFee: BackendApiClient.requireInt(json, 'deliveryFee'),
+      pickupCode: json['pickupCode']?.toString(),
     );
   }
 }
@@ -110,19 +110,16 @@ class OrderSummary {
 
   factory OrderSummary.fromJson(Map<String, dynamic> json) {
     return OrderSummary(
-      id: json['id'] as String,
-      status: json['status'] as String,
-      amount: json['amount'] as int,
-      currency: json['currency'] as String,
-      deliveryMode: json['deliveryMode'] as String? ?? 'pickup',
-      deliveryFee: json['deliveryFee'] as int? ?? 0,
-      pickupCode: json['pickupCode'] as String,
-      pickupSlot: json['pickupSlot'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      items:
-          (json['items'] as List<dynamic>)
-              .map((item) => item as Map<String, dynamic>)
-              .toList(),
+      id: BackendApiClient.requireString(json, 'id'),
+      status: BackendApiClient.requireString(json, 'status'),
+      amount: BackendApiClient.requireInt(json, 'amount'),
+      currency: BackendApiClient.requireString(json, 'currency'),
+      deliveryMode: BackendApiClient.requireString(json, 'deliveryMode'),
+      deliveryFee: BackendApiClient.requireInt(json, 'deliveryFee'),
+      pickupCode: BackendApiClient.requireString(json, 'pickupCode'),
+      pickupSlot: json['pickupSlot']?.toString(),
+      createdAt: BackendApiClient.requireDate(json, 'createdAt'),
+      items: BackendApiClient.requireObjectList(json, 'items'),
     );
   }
 }
@@ -138,8 +135,8 @@ class PaymentIntentResponse {
 
   factory PaymentIntentResponse.fromJson(Map<String, dynamic> json) {
     return PaymentIntentResponse(
-      paymentIntentId: json['paymentIntentId'] as String,
-      clientSecret: json['clientSecret'] as String,
+      paymentIntentId: BackendApiClient.requireString(json, 'paymentIntentId'),
+      clientSecret: BackendApiClient.requireString(json, 'clientSecret'),
     );
   }
 }
@@ -152,8 +149,8 @@ class OrderActionResponse {
 
   factory OrderActionResponse.fromJson(Map<String, dynamic> json) {
     return OrderActionResponse(
-      orderId: json['orderId'] as String,
-      status: json['status'] as String,
+      orderId: BackendApiClient.requireString(json, 'orderId'),
+      status: BackendApiClient.requireString(json, 'status'),
     );
   }
 }
@@ -175,21 +172,29 @@ class PaymentApiService {
       request.toJson(),
     );
 
-    return PaymentIntentResponse.fromJson(body);
+    return _parse(() => PaymentIntentResponse.fromJson(body));
   }
 
   Future<CreateOrderResponse> createOrder(CreateOrderRequest request) async {
     final body = await _post('/api/v1/orders', request.toJson());
 
-    return CreateOrderResponse.fromJson(body);
+    return _parse(() => CreateOrderResponse.fromJson(body));
   }
 
   Future<List<OrderSummary>> getMyOrders() async {
     final body = await _get('/api/v1/orders/me');
 
-    return (body['orders'] as List<dynamic>)
-        .map((order) => OrderSummary.fromJson(order as Map<String, dynamic>))
-        .toList();
+    try {
+      return _parse(
+        () =>
+            BackendApiClient.requireObjectList(
+              body,
+              'orders',
+            ).map(OrderSummary.fromJson).toList(),
+      );
+    } on BackendApiException catch (error) {
+      throw PaymentApiException.fromBackend(error);
+    }
   }
 
   Future<OrderActionResponse> cancelOrder(
@@ -199,7 +204,7 @@ class PaymentApiService {
     final body = await _post('/api/v1/orders/$orderId/cancel', {
       if (reason != null && reason.isNotEmpty) 'reason': reason,
     });
-    return OrderActionResponse.fromJson(body);
+    return _parse(() => OrderActionResponse.fromJson(body));
   }
 
   Future<OrderActionResponse> completePickup({
@@ -209,7 +214,7 @@ class PaymentApiService {
     final body = await _post('/api/v1/orders/$orderId/pickup', {
       'pickupCode': pickupCode,
     });
-    return OrderActionResponse.fromJson(body);
+    return _parse(() => OrderActionResponse.fromJson(body));
   }
 
   Future<void> reviewOrder({
@@ -239,6 +244,19 @@ class PaymentApiService {
       return await _api.post(path, body: body);
     } on BackendApiException catch (error) {
       throw PaymentApiException.fromBackend(error);
+    }
+  }
+
+  T _parse<T>(T Function() parser) {
+    try {
+      return parser();
+    } on BackendApiException catch (error) {
+      throw PaymentApiException.fromBackend(error);
+    } catch (_) {
+      throw const PaymentApiException(
+        statusCode: 200,
+        message: 'invalid_backend_response',
+      );
     }
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+const _defaultMapTileUrlTemplate =
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
 class ApiEnvironment {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -14,13 +17,20 @@ class ApiEnvironment {
 
   static const mapTileUrlTemplate = String.fromEnvironment(
     'MAP_TILE_URL_TEMPLATE',
-    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    defaultValue: _defaultMapTileUrlTemplate,
   );
 
   static const mapTileUserAgentPackageName = String.fromEnvironment(
     'MAP_TILE_USER_AGENT_PACKAGE_NAME',
     defaultValue: 'com.dailycatch.app',
   );
+
+  static const _demoFallbacksEnabled = bool.fromEnvironment(
+    'DEMO_FALLBACKS_ENABLED',
+    defaultValue: false,
+  );
+
+  static bool get isDemoFallbackAllowed => false;
 
   static void validateRuntimeConfiguration() {
     if (!kReleaseMode) return;
@@ -36,6 +46,8 @@ class ApiEnvironment {
     String devApiKey = apiKey,
     String publishableKey = stripePublishableKey,
     String tileUrlTemplate = mapTileUrlTemplate,
+    String tileUserAgentPackageName = mapTileUserAgentPackageName,
+    bool demoFallbacksEnabled = _demoFallbacksEnabled,
   }) {
     final issues = <String>[];
     final apiUri = Uri.tryParse(apiBaseUrl);
@@ -54,8 +66,18 @@ class ApiEnvironment {
       issues.add('API_KEY must not be embedded in a release build');
     }
 
-    if (publishableKey.startsWith('pk_test_')) {
+    if (demoFallbacksEnabled) {
+      issues.add('DEMO_FALLBACKS_ENABLED must be false in release builds');
+    }
+
+    if (publishableKey.isEmpty) {
+      issues.add('STRIPE_PUBLISHABLE_KEY is required in release builds');
+    } else if (publishableKey.startsWith('pk_test_')) {
       issues.add('STRIPE_PUBLISHABLE_KEY must not use a test key in release');
+    } else if (!publishableKey.startsWith('pk_live_')) {
+      issues.add(
+        'STRIPE_PUBLISHABLE_KEY must use a live publishable key in release',
+      );
     }
     if (_isPlaceholder(publishableKey)) {
       issues.add('STRIPE_PUBLISHABLE_KEY must not use a placeholder value');
@@ -65,8 +87,25 @@ class ApiEnvironment {
     if (_isPlaceholder(tileUrlTemplate)) {
       issues.add('MAP_TILE_URL_TEMPLATE must not use a placeholder value');
     }
+    if (tileUrlTemplate == _defaultMapTileUrlTemplate) {
+      issues.add(
+        'MAP_TILE_URL_TEMPLATE must be explicitly set for release builds',
+      );
+    }
     if (tileUri == null || tileUri.scheme != 'https') {
       issues.add('MAP_TILE_URL_TEMPLATE must use HTTPS in release');
+    }
+    for (final requiredToken in ['{z}', '{x}', '{y}']) {
+      if (!tileUrlTemplate.contains(requiredToken)) {
+        issues.add('MAP_TILE_URL_TEMPLATE must include $requiredToken');
+      }
+    }
+
+    if (tileUserAgentPackageName.isEmpty ||
+        _isPlaceholder(tileUserAgentPackageName)) {
+      issues.add(
+        'MAP_TILE_USER_AGENT_PACKAGE_NAME must be explicitly set for release builds',
+      );
     }
 
     return issues;

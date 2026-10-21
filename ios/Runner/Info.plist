@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dailycatch</string>
+	<string>DailyCatch</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>myapp</string>
+	<string>DailyCatch</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,5 +49,7 @@
 	<string>DailyCatch utilise la camera pour scanner les QR codes de retrait.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>DailyCatch utilise votre position pour afficher les paniers disponibles près de vous.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DailyCatch utilise votre galerie pour importer vos photos de profil, de commerce et de paniers.</string>
 </dict>
 </plist>

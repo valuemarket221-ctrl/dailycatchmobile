@@ -141,9 +141,11 @@ class BackendApiClient {
     required bool authenticated,
     bool hasJsonBody = false,
   }) async {
-    final bearerToken = authenticated ? await _tokenProvider() : null;
+    final bearerToken =
+        authenticated ? await _tokenProvider() : null;
     return {
       'accept': 'application/json',
+      'x-dailycatch-client': 'flutter',
       if (hasJsonBody) 'content-type': 'application/json',
       if (bearerToken != null && bearerToken.isNotEmpty)
         'authorization': 'Bearer $bearerToken',
@@ -193,6 +195,104 @@ class BackendApiClient {
       }
       return <String, dynamic>{'error': 'backend_http_${response.statusCode}'};
     }
+  }
+
+  static List<dynamic> requireList(
+    Map<String, dynamic> body,
+    String fieldName,
+  ) {
+    final value = body[fieldName];
+    if (value is List<dynamic>) return value;
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static List<Map<String, dynamic>> requireObjectList(
+    Map<String, dynamic> body,
+    String fieldName,
+  ) {
+    final list = requireList(body, fieldName);
+    try {
+      return [
+        for (final item in list)
+          if (item is Map<String, dynamic>)
+            item
+          else
+            throw const FormatException(),
+      ];
+    } catch (_) {
+      throw const BackendApiException(
+        statusCode: 200,
+        code: 'invalid_backend_response',
+      );
+    }
+  }
+
+  static Map<String, dynamic> requireObject(
+    Map<String, dynamic> body,
+    String fieldName,
+  ) {
+    final value = body[fieldName];
+    if (value is Map<String, dynamic>) return value;
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static Map<String, dynamic>? optionalObject(
+    Map<String, dynamic> body,
+    String fieldName,
+  ) {
+    final value = body[fieldName];
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static String requireString(Map<String, dynamic> body, String fieldName) {
+    final value = body[fieldName];
+    if (value is String && value.trim().isNotEmpty) return value;
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static int requireInt(Map<String, dynamic> body, String fieldName) {
+    final value = body[fieldName];
+    if (value is int) return value;
+    if (value is num && value.isFinite) return value.toInt();
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static bool requireBool(Map<String, dynamic> body, String fieldName) {
+    final value = body[fieldName];
+    if (value is bool) return value;
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
+  }
+
+  static DateTime requireDate(Map<String, dynamic> body, String fieldName) {
+    final value = body[fieldName];
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    throw const BackendApiException(
+      statusCode: 200,
+      code: 'invalid_backend_response',
+    );
   }
 }
 

@@ -1,4 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:myapp/demo/demo_mode.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -28,7 +30,9 @@ final firebaseOptions = FirebaseOptions(
 void main() async {
   // Assure que les liaisons Flutter sont prêtes avant d'exécuter du code natif.
   WidgetsFlutterBinding.ensureInitialized();
+  if (DemoMode.enabled) GoogleFonts.config.allowRuntimeFetching = false;
   ApiEnvironment.validateRuntimeConfiguration();
+  Environment.validateRuntimeConfiguration();
   PaintingBinding.instance.imageCache.maximumSize = 120;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 120 << 20;
   usePathUrlStrategy();
@@ -38,15 +42,14 @@ void main() async {
   await initializeDateFormatting('fr_FR', null);
   await initializeDateFormatting('en_US', null);
   await initializeDateFormatting('de_DE', null);
-  // Initialise Firebase avec les options de configuration.
-  if (!Environment.isFirebaseConfigured) {
-    throw StateError(
-      'Firebase configuration is missing. Provide FIREBASE_* values with --dart-define.',
-    );
+  final firebaseInitialized = await _initializeFirebase();
+  if (firebaseInitialized) {
+    PushTokenRegistrationService().registerDeviceToken().ignore();
   }
-  await Firebase.initializeApp(options: firebaseOptions);
-  PushTokenRegistrationService().registerDeviceToken().ignore();
-  if (!kIsWeb && ApiEnvironment.stripePublishableKey.isNotEmpty) {
+
+  if (!DemoMode.enabled &&
+      !kIsWeb &&
+      ApiEnvironment.stripePublishableKey.isNotEmpty) {
     Stripe.publishableKey = ApiEnvironment.stripePublishableKey;
     await Stripe.instance.applySettings();
   }
@@ -65,6 +68,36 @@ void main() async {
       child: const MyApp(),
     ),
   );
+}
+
+Future<bool> _initializeFirebase() async {
+  if (DemoMode.enabled) return false;
+  if (Environment.isFirebaseConfigured) {
+    await Firebase.initializeApp(options: firebaseOptions);
+    return true;
+  }
+
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      return true;
+    } catch (error) {
+      if (kReleaseMode) rethrow;
+      debugPrint(
+        'Native Firebase configuration unavailable: authentication unavailable.',
+      );
+      return false;
+    }
+  }
+
+  if (kReleaseMode) {
+    throw StateError(
+      'Firebase configuration is missing. Provide FIREBASE_* values with --dart-define.',
+    );
+  }
+
+  debugPrint('Firebase configuration missing: authentication unavailable.');
+  return false;
 }
 
 class MyApp extends StatelessWidget {

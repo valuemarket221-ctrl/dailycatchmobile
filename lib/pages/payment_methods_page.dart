@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/services/client_api_service.dart';
 
 class PaymentMethodsPage extends StatefulWidget {
   const PaymentMethodsPage({super.key});
@@ -11,13 +13,51 @@ class PaymentMethodsPage extends StatefulWidget {
 }
 
 class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
-  final List<(IconData, String, String)> _methods = [
-    (Icons.credit_card, 'Carte bancaire', 'Visa •••• 4242'),
-    (Icons.phone_android, 'Orange Money', '+221 77 ••• •• 67'),
-  ];
+  final ClientApiService _clientApiService = ClientApiService();
+  var _isLoading = true;
+  String? _loadError;
+  List<ClientPaymentMethodDto> _methods = const [];
 
-  void _addPayment() {
-    context.push('/add-payment');
+  @override
+  void initState() {
+    super.initState();
+    _loadMethods();
+  }
+
+  Future<void> _loadMethods() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final methods = await _clientApiService.getMyPaymentMethods();
+      if (!mounted) return;
+      setState(() {
+        _methods = methods;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'Moyens de paiement indisponibles. Réessayez.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _addPayment() async {
+    await context.push('/add-payment');
+    if (mounted) await _loadMethods();
+  }
+
+  Future<void> _deleteMethod(ClientPaymentMethodDto method) async {
+    try {
+      await _clientApiService.deletePaymentMethod(method.id);
+      if (mounted) await _loadMethods();
+    } catch (_) {
+      if (mounted) _message('Suppression impossible');
+    }
   }
 
   void _message(String text) {
@@ -41,7 +81,7 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
                 const Spacer(),
@@ -51,15 +91,65 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
               ],
             ),
             const SizedBox(height: 28),
-            ..._methods.map(
-              (method) => _MethodTile(
-                icon: method.$1,
-                title: method.$2,
-                subtitle: method.$3,
-                onTap: () => _message('${method.$2} sélectionné'),
-              ),
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.blueBic,
+                        ),
+                      )
+                      : _loadError != null
+                      ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _loadError!,
+                              style: _subtitle,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 14),
+                            TextButton(
+                              onPressed: _loadMethods,
+                              child: Text('Réessayer', style: _link),
+                            ),
+                          ],
+                        ),
+                      )
+                      : _methods.isEmpty
+                      ? Center(
+                        child: Text(
+                          'Aucun moyen de paiement enregistré',
+                          style: _subtitle,
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                      : RefreshIndicator(
+                        color: AppColors.blueBic,
+                        onRefresh: _loadMethods,
+                        child: ListView.builder(
+                          itemCount: _methods.length,
+                          itemBuilder: (context, index) {
+                            final method = _methods[index];
+                            return _MethodTile(
+                              icon:
+                                  method.type == 'mobile_money'
+                                      ? Icons.phone_android
+                                      : Icons.credit_card,
+                              title:
+                                  method.type == 'mobile_money'
+                                      ? 'Mobile Money'
+                                      : 'Carte bancaire',
+                              subtitle: method.label,
+                              onTap:
+                                  () => _message('${method.label} sélectionné'),
+                              onDelete: () => _deleteMethod(method),
+                            );
+                          },
+                        ),
+                      ),
             ),
-            const Spacer(),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -87,12 +177,14 @@ class _MethodTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    required this.onDelete,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -121,7 +213,10 @@ class _MethodTile extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Color(0xFF9AA8AA)),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline, color: Color(0xFF9AA8AA)),
+          ),
         ],
       ),
     ),
@@ -142,6 +237,11 @@ final _subtitle = GoogleFonts.poppins(
   fontSize: 11,
   fontWeight: FontWeight.w600,
   color: const Color(0xFF526669),
+);
+final _link = GoogleFonts.poppins(
+  fontSize: 11,
+  fontWeight: FontWeight.w900,
+  color: AppColors.blueBic,
 );
 final _button = GoogleFonts.poppins(
   fontSize: 12,

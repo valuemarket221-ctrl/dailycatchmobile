@@ -92,6 +92,8 @@ web/firebase-config.json
 .env
 .env.*
 *.env
+!.env.mobile.example
+!.env.mobile.release.example
 
 # Backend related
 /backend/node_modules/

@@ -17,6 +17,9 @@ class ProductOffer {
     this.latitude,
     this.longitude,
     this.distanceKm,
+    this.storeAddress,
+    this.storeRating,
+    this.storeReviewCount = 0,
   });
 
   final String id;
@@ -36,6 +39,19 @@ class ProductOffer {
   final double? latitude;
   final double? longitude;
   final double? distanceKm;
+  final String? storeAddress;
+  final double? storeRating;
+  final int storeReviewCount;
+
+  bool get hasValidCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.isFinite &&
+      longitude!.isFinite &&
+      latitude! >= -90 &&
+      latitude! <= 90 &&
+      longitude! >= -180 &&
+      longitude! <= 180;
 
   bool get isCfa => currency.toLowerCase() == 'xof';
 
@@ -47,33 +63,65 @@ class ProductOffer {
 
   factory ProductOffer.fromJson(Map<String, dynamic> json) {
     return ProductOffer(
-      id: json['id'] as String,
-      storeId: json['storeId'] as String,
+      id: _string(json['id']),
+      storeId: _string(json['storeId']),
       storeName: json['storeName'] as String? ?? 'Commerce DailyCatch',
-      name: json['name'] as String,
-      currency: json['currency'] as String,
-      unitAmount: json['unitAmount'] as int,
-      availableQuantity: json['availableQuantity'] as int,
+      name: _string(json['name']),
+      currency: json['currency'] as String? ?? 'xof',
+      unitAmount: _int(json['unitAmount']),
+      availableQuantity: _int(json['availableQuantity']),
       description: json['description'] as String?,
       category: json['category'] as String?,
       weightEstimate: json['weightEstimate'] as String?,
-      originalUnitAmount: json['originalUnitAmount'] as int?,
-      pickupStartsAt:
-          json['pickupStartsAt'] == null
-              ? null
-              : DateTime.parse(json['pickupStartsAt'] as String),
-      pickupEndsAt:
-          json['pickupEndsAt'] == null
-              ? null
-              : DateTime.parse(json['pickupEndsAt'] as String),
+      originalUnitAmount: _optionalInt(json['originalUnitAmount']),
+      pickupStartsAt: _optionalDate(json['pickupStartsAt']),
+      pickupEndsAt: _optionalDate(json['pickupEndsAt']),
       mediaUrls:
           (json['mediaUrls'] as List<dynamic>? ?? const [])
               .map((url) => url as String)
               .toList(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+      latitude: _optionalDouble(json['latitude']),
+      longitude: _optionalDouble(json['longitude']),
+      distanceKm: _optionalDouble(json['distanceKm']),
+      storeAddress: json['storeAddress'] as String?,
+      storeRating: _optionalDouble(json['storeRating']),
+      storeReviewCount: _optionalInt(json['storeReviewCount']) ?? 0,
     );
+  }
+
+  static String _string(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) {
+      throw const FormatException('missing required product offer field');
+    }
+    return text;
+  }
+
+  static int _int(Object? value) {
+    final parsed = _optionalInt(value);
+    if (parsed == null) {
+      throw const FormatException('missing required product offer integer');
+    }
+    return parsed;
+  }
+
+  static int? _optionalInt(Object? value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse(value.toString());
+  }
+
+  static double? _optionalDouble(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  static DateTime? _optionalDate(Object? value) {
+    final text = value?.toString();
+    if (text == null || text.isEmpty) return null;
+    return DateTime.tryParse(text);
   }
 
   Map<String, dynamic> toProductMap({

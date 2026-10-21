@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
+import 'package:myapp/pages/my_reservations_page.dart';
 
 class OrderTrackingPage extends StatelessWidget {
-  const OrderTrackingPage({super.key});
+  const OrderTrackingPage({super.key, this.reservation});
+
+  final Reservation? reservation;
 
   @override
   Widget build(BuildContext context) {
+    final storeName = reservation?.partnerName ?? 'Poissonnerie Yoff';
+    final statusLabel = _trackingStatusLabel(reservation?.status);
+    final subtitle = _trackingSubtitle(reservation?.status);
+    final steps = _trackingSteps(reservation?.status);
+
     return Scaffold(
       body: Stack(
         children: [
@@ -18,7 +26,7 @@ class OrderTrackingPage extends StatelessWidget {
               child: Align(
                 alignment: Alignment.topLeft,
                 child: IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: Color(0xFF31575C)),
                 ),
               ),
@@ -50,33 +58,20 @@ class OrderTrackingPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Poissonnerie Yoff', style: _sheetTitle),
+                  Text(storeName, style: _sheetTitle),
                   const SizedBox(height: 8),
-                  Text('Préparation en cours', style: _status),
+                  Text(statusLabel, style: _status),
                   const SizedBox(height: 8),
-                  Text(
-                    'Votre panier est en cours de préparation.',
-                    style: _subtitle,
-                  ),
+                  Text(subtitle, style: _subtitle),
                   const Divider(height: 32, color: Color(0xFFE4EAEA)),
-                  const _Step(
+                  _Step(
                     label: 'Votre réservation confirmée',
-                    state: _StepState.done,
+                    state: steps[0],
                     isFirst: true,
                   ),
-                  const _Step(
-                    label: 'Préparation en cours',
-                    state: _StepState.active,
-                  ),
-                  const _Step(
-                    label: 'Prêt à être récupéré',
-                    state: _StepState.pending,
-                  ),
-                  const _Step(
-                    label: 'Récupéré',
-                    state: _StepState.pending,
-                    isLast: true,
-                  ),
+                  _Step(label: 'Préparation en cours', state: steps[1]),
+                  _Step(label: 'Prêt à être récupéré', state: steps[2]),
+                  _Step(label: 'Récupéré', state: steps[3], isLast: true),
                   const Divider(height: 28, color: Color(0xFFE4EAEA)),
                   Center(
                     child: Text('Besoin d’aide ? Contactez-nous', style: _help),
@@ -92,6 +87,57 @@ class OrderTrackingPage extends StatelessWidget {
 }
 
 enum _StepState { done, active, pending }
+
+String _trackingStatusLabel(ReservationStatus? status) {
+  switch (status) {
+    case ReservationStatus.completed:
+      return 'Commande récupérée';
+    case ReservationStatus.cancelled:
+      return 'Réservation annulée';
+    case ReservationStatus.active:
+    case null:
+      return 'Préparation en cours';
+  }
+}
+
+String _trackingSubtitle(ReservationStatus? status) {
+  switch (status) {
+    case ReservationStatus.completed:
+      return 'Votre panier a bien été récupéré.';
+    case ReservationStatus.cancelled:
+      return 'Cette réservation n’est plus disponible.';
+    case ReservationStatus.active:
+    case null:
+      return 'Votre panier est en cours de préparation.';
+  }
+}
+
+List<_StepState> _trackingSteps(ReservationStatus? status) {
+  switch (status) {
+    case ReservationStatus.completed:
+      return const [
+        _StepState.done,
+        _StepState.done,
+        _StepState.done,
+        _StepState.done,
+      ];
+    case ReservationStatus.cancelled:
+      return const [
+        _StepState.done,
+        _StepState.pending,
+        _StepState.pending,
+        _StepState.pending,
+      ];
+    case ReservationStatus.active:
+    case null:
+      return const [
+        _StepState.done,
+        _StepState.active,
+        _StepState.pending,
+        _StepState.pending,
+      ];
+  }
+}
 
 class _Step extends StatelessWidget {
   const _Step({

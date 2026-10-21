@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
 import 'package:myapp/services/message_api_service.dart';
+import 'package:myapp/services/client_api_service.dart';
+import 'package:myapp/services/payment_api_service.dart';
+import 'package:myapp/services/support_api_service.dart';
+import 'package:myapp/pages/my_reservations_page.dart';
+import 'package:myapp/utils/api_error_messages.dart';
+import 'package:myapp/widgets/app_remote_image.dart';
 
 class ClientChatPage extends StatefulWidget {
   const ClientChatPage({
@@ -195,7 +202,7 @@ class _ClientChatPageState extends State<ClientChatPage> {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
                 const CircleAvatar(
@@ -570,14 +577,19 @@ class _ClientReviewPageState extends State<ClientReviewPage> {
 }
 
 class CancelOrderPage extends StatefulWidget {
-  const CancelOrderPage({super.key});
+  const CancelOrderPage({super.key, this.reservation});
+
+  final Reservation? reservation;
 
   @override
   State<CancelOrderPage> createState() => _CancelOrderPageState();
 }
 
 class _CancelOrderPageState extends State<CancelOrderPage> {
+  final PaymentApiService _paymentApiService = PaymentApiService();
+  final TextEditingController _detailsController = TextEditingController();
   int _selected = 4;
+  bool _isSubmitting = false;
   static const _reasons = [
     'Changement de programme',
     'Trouvé moins cher ailleurs',
@@ -587,12 +599,50 @@ class _CancelOrderPageState extends State<CancelOrderPage> {
   ];
 
   @override
+  void dispose() {
+    _detailsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+    final reservation = widget.reservation;
+    if (reservation == null) {
+      context.go('/orders');
+      return;
+    }
+
+    final details = _detailsController.text.trim();
+    final reason =
+        details.isEmpty
+            ? _reasons[_selected]
+            : '${_reasons[_selected]} - $details';
+
+    setState(() => _isSubmitting = true);
+    try {
+      await _paymentApiService.cancelOrder(reservation.id, reason: reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Demande d’annulation enregistrée.')),
+      );
+      context.go('/orders');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiErrorMessages.fromObject(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => _Shell(
     title: 'Annuler la commande',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SmallOrder(),
+        _SmallOrder(reservation: widget.reservation),
         const SizedBox(height: 20),
         Text('Pourquoi annulez-vous ?', style: _label),
         const SizedBox(height: 10),
@@ -620,19 +670,78 @@ class _CancelOrderPageState extends State<CancelOrderPage> {
             ),
           ),
         ),
-        const _Box('Précisez votre motif...'),
+        _TextArea(
+          controller: _detailsController,
+          hintText: 'Précisez votre motif...',
+        ),
         const Spacer(),
         _Button(
-          label: 'Confirmer l’annulation',
-          onPressed: () => context.go('/orders'),
+          label: _isSubmitting ? 'Envoi en cours...' : 'Confirmer l’annulation',
+          onPressed: _submit,
         ),
       ],
     ),
   );
 }
 
-class RefundRequestPage extends StatelessWidget {
-  const RefundRequestPage({super.key});
+class RefundRequestPage extends StatefulWidget {
+  const RefundRequestPage({super.key, this.reservation});
+
+  final Reservation? reservation;
+
+  @override
+  State<RefundRequestPage> createState() => _RefundRequestPageState();
+}
+
+class _RefundRequestPageState extends State<RefundRequestPage> {
+  final SupportApiService _supportApiService = SupportApiService();
+  final TextEditingController _messageController = TextEditingController(
+    text: 'Le produit ne correspondait pas à ma commande.',
+  );
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+    final reservation = widget.reservation;
+    final message = _messageController.text.trim();
+    if (message.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Décrivez le problème en quelques mots.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final ticketId = await _supportApiService.createTicket(
+        orderId: reservation?.id,
+        category: 'refund',
+        subject:
+            reservation == null
+                ? 'Demande de remboursement'
+                : 'Demande de remboursement ${reservation.id}',
+        message: message,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Demande envoyée ($ticketId).')));
+      context.go('/orders');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiErrorMessages.fromObject(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _Shell(
@@ -640,14 +749,11 @@ class RefundRequestPage extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SmallOrder(),
+        _SmallOrder(reservation: widget.reservation),
         const SizedBox(height: 22),
         Text('Décrivez ensuite, vous ?', style: _label),
         const SizedBox(height: 10),
-        const _Box(
-          'Le produit ne correspondait\npas à ma commande.',
-          height: 82,
-        ),
+        _TextArea(controller: _messageController, height: 82),
         const SizedBox(height: 20),
         Text('Ajouter une photo (optionnel)', style: _label),
         const SizedBox(height: 10),
@@ -655,11 +761,13 @@ class RefundRequestPage extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png',
+              child: AppRemoteImage(
+                path:
+                    widget.reservation?.imagePath ??
+                    'assets/images/ChatGPT Image 12 août 2026, 16_32_59.png',
                 width: 76,
                 height: 76,
-                fit: BoxFit.cover,
+                cacheWidth: 180,
               ),
             ),
             const SizedBox(width: 14),
@@ -676,37 +784,192 @@ class RefundRequestPage extends StatelessWidget {
         ),
         const Spacer(),
         _Button(
-          label: 'Demander un\nremboursement',
-          onPressed: () => context.go('/orders'),
+          label:
+              _isSubmitting
+                  ? 'Envoi en cours...'
+                  : 'Demander un\nremboursement',
+          onPressed: _submit,
         ),
       ],
     ),
   );
 }
 
-class NewAddressPage extends StatelessWidget {
+class NewAddressPage extends StatefulWidget {
   const NewAddressPage({super.key});
+
+  @override
+  State<NewAddressPage> createState() => _NewAddressPageState();
+}
+
+class _NewAddressPageState extends State<NewAddressPage> {
+  final ClientApiService _clientApiService = ClientApiService();
+  final _label = TextEditingController();
+  final _fullName = TextEditingController();
+  final _phone = TextEditingController();
+  final _address = TextEditingController();
+  final _complement = TextEditingController();
+  final _country = TextEditingController(text: 'Sénégal');
+  var _isSaving = false;
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _fullName.dispose();
+    _phone.dispose();
+    _address.dispose();
+    _complement.dispose();
+    _country.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    if (_label.text.trim().isEmpty || _address.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nom du lieu et adresse requis.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await _clientApiService.createAddress(
+        label: _label.text.trim(),
+        fullName: _fullName.text.trim(),
+        phone: _phone.text.trim(),
+        address: _address.text.trim(),
+        complement: _complement.text.trim(),
+        country:
+            _country.text.trim().isEmpty ? 'Sénégal' : _country.text.trim(),
+      );
+      if (mounted) safePop(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’enregistrer l’adresse.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _Shell(
     title: 'Nouvelle adresse',
     child: Column(
       children: [
-        const _Input('Nom du lieu', 'Maison'),
-        const _Input('Nom complet', 'Ibrahima Kane'),
-        const _Input('Téléphone', '+221 77 123 45 67'),
-        const _Input('Adresse', 'Almadies, Dakar'),
-        const _Input('Complément (optionnel)', 'Villa n°5'),
-        const _Input('Pays', 'Sénégal'),
+        _AddressInput(label: 'Nom du lieu', controller: _label),
+        _AddressInput(label: 'Nom complet', controller: _fullName),
+        _AddressInput(label: 'Téléphone', controller: _phone),
+        _AddressInput(label: 'Adresse', controller: _address),
+        _AddressInput(label: 'Complément (optionnel)', controller: _complement),
+        _AddressInput(label: 'Pays', controller: _country),
         const Spacer(),
-        _Button(label: 'Enregistrer', onPressed: () => context.pop()),
+        _Button(
+          label: _isSaving ? 'Enregistrement...' : 'Enregistrer',
+          onPressed: _save,
+        ),
       ],
     ),
   );
 }
 
-class AddPaymentPage extends StatelessWidget {
+class _AddressInput extends StatelessWidget {
+  const _AddressInput({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: _label),
+        const SizedBox(height: 7),
+        TextField(
+          controller: controller,
+          style: _row,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFE1E8E6)),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class AddPaymentPage extends StatefulWidget {
   const AddPaymentPage({super.key});
+
+  @override
+  State<AddPaymentPage> createState() => _AddPaymentPageState();
+}
+
+class _AddPaymentPageState extends State<AddPaymentPage> {
+  final ClientApiService _clientApiService = ClientApiService();
+  final _cardNumber = TextEditingController();
+  final _holder = TextEditingController();
+  final _expiry = TextEditingController();
+  final _cvv = TextEditingController();
+  final _mobileMoney = TextEditingController();
+  var _useMobileMoney = false;
+  var _isSaving = false;
+
+  @override
+  void dispose() {
+    _cardNumber.dispose();
+    _holder.dispose();
+    _expiry.dispose();
+    _cvv.dispose();
+    _mobileMoney.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    final label =
+        _useMobileMoney
+            ? _maskedPhone(_mobileMoney.text)
+            : _maskedCard(_cardNumber.text);
+    if (label.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Information de paiement requise.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await _clientApiService.createPaymentMethod(
+        type: _useMobileMoney ? 'mobile_money' : 'card',
+        label: label,
+        provider: _useMobileMoney ? 'mobile_money' : 'card',
+        tokenReference: _buildTokenReference(),
+      );
+      if (mounted) safePop(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d’ajouter ce moyen de paiement.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _Shell(
@@ -716,41 +979,74 @@ class AddPaymentPage extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Carte bancaire', style: _tabActive),
+            GestureDetector(
+              onTap: () => setState(() => _useMobileMoney = false),
+              child: Text(
+                'Carte bancaire',
+                style: _useMobileMoney ? _tab : _tabActive,
+              ),
+            ),
             const SizedBox(width: 26),
-            Text('Mobile Money', style: _tab),
+            GestureDetector(
+              onTap: () => setState(() => _useMobileMoney = true),
+              child: Text(
+                'Mobile Money',
+                style: _useMobileMoney ? _tabActive : _tab,
+              ),
+            ),
           ],
         ),
         const Divider(height: 26, color: Color(0xFFE1E8E6)),
-        const _Input('Numéro de carte', '•••• •••• •••• 4322     VISA'),
-        const _Input('Titulaire de la carte', 'Ibrahima Kane'),
-        Row(
-          children: const [
-            Expanded(child: _Input('Date d’expiration', '04/27')),
-            SizedBox(width: 14),
-            Expanded(child: _Input('CVV', '•••')),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Enregistrer pour mes prochains\npaiements',
-                style: _label,
+        if (_useMobileMoney)
+          _AddressInput(label: 'Numéro Mobile Money', controller: _mobileMoney)
+        else ...[
+          _AddressInput(label: 'Numéro de carte', controller: _cardNumber),
+          _AddressInput(label: 'Titulaire de la carte', controller: _holder),
+          Row(
+            children: [
+              Expanded(
+                child: _AddressInput(
+                  label: 'Date d’expiration',
+                  controller: _expiry,
+                ),
               ),
-            ),
-            Switch(
-              value: true,
-              activeThumbColor: AppColors.blueBic,
-              onChanged: (_) {},
-            ),
-          ],
-        ),
+              const SizedBox(width: 14),
+              Expanded(child: _AddressInput(label: 'CVV', controller: _cvv)),
+            ],
+          ),
+        ],
         const Spacer(),
-        _Button(label: 'Ajouter la carte', onPressed: () => context.pop()),
+        _Button(
+          label:
+              _isSaving
+                  ? 'Enregistrement...'
+                  : _useMobileMoney
+                  ? 'Ajouter le numéro'
+                  : 'Ajouter la carte',
+          onPressed: _save,
+        ),
       ],
     ),
   );
+
+  String _maskedCard(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 4) return '';
+    return 'Carte •••• ${digits.substring(digits.length - 4)}';
+  }
+
+  String _maskedPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 4) return '';
+    return 'Mobile Money ••• ${digits.substring(digits.length - 4)}';
+  }
+
+  String _buildTokenReference() {
+    final source = _useMobileMoney ? _mobileMoney.text : _cardNumber.text;
+    final digits = source.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 4) return 'tok_client_payment_method';
+    return 'tok_client_${_useMobileMoney ? 'mobile' : 'card'}_${digits.substring(digits.length - 4)}';
+  }
 }
 
 class SearchEmptyPage extends StatelessWidget {
@@ -829,7 +1125,7 @@ class _Shell extends StatelessWidget {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => safePop(context),
                   icon: const Icon(Icons.arrow_back, color: AppColors.blueBic),
                 ),
                 const Spacer(),
@@ -848,20 +1144,23 @@ class _Shell extends StatelessWidget {
 }
 
 class _SmallOrder extends StatelessWidget {
-  const _SmallOrder({this.orderId});
+  const _SmallOrder({this.orderId, this.reservation});
 
   final String? orderId;
+  final Reservation? reservation;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.asset(
-          'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
+        child: AppRemoteImage(
+          path:
+              reservation?.imagePath ??
+              'assets/images/ChatGPT Image 13 août 2026, 00_41_42.png',
           width: 58,
           height: 58,
-          fit: BoxFit.cover,
+          cacheWidth: 140,
         ),
       ),
       const SizedBox(width: 12),
@@ -869,8 +1168,14 @@ class _SmallOrder extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Commande ${orderId ?? '#DC-1364'}', style: _label),
-            Text('Poissonnerie Chez Moussa', style: _muted),
+            Text(
+              'Commande ${reservation?.id ?? orderId ?? '#DC-1364'}',
+              style: _label,
+            ),
+            Text(
+              reservation?.partnerName ?? 'Poissonnerie Chez Moussa',
+              style: _muted,
+            ),
           ],
         ),
       ),
@@ -878,33 +1183,50 @@ class _SmallOrder extends StatelessWidget {
   );
 }
 
-class _Input extends StatelessWidget {
-  const _Input(this.label, this.value);
-  final String label;
-  final String value;
+class _TextArea extends StatelessWidget {
+  const _TextArea({required this.controller, this.hintText, this.height = 58});
+
+  final TextEditingController controller;
+  final String? hintText;
+  final double height;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: _label),
-        const SizedBox(height: 7),
-        _Box(value, height: 46),
-      ],
+  Widget build(BuildContext context) => SizedBox(
+    height: height,
+    child: TextField(
+      controller: controller,
+      maxLines: null,
+      expands: true,
+      style: _row,
+      textAlignVertical: TextAlignVertical.top,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: _muted,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE1E8E6)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.blueBic),
+        ),
+      ),
     ),
   );
 }
 
 class _Box extends StatelessWidget {
-  const _Box(this.text, {this.height = 58});
+  const _Box(this.text);
   final String text;
-  final double height;
 
   @override
   Widget build(BuildContext context) => Container(
-    height: height,
+    height: 58,
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
