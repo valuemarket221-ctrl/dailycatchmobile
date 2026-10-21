@@ -2,6 +2,15 @@ name: CD
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Validation artifact or configured production artifact'
+        required: true
+        default: validation
+        type: choice
+        options:
+          - validation
+          - production
   push:
     tags:
       - "v*"
@@ -18,7 +27,7 @@ jobs:
     name: Flutter Web Artifact
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    environment: production
+    environment: ${{ inputs.target == 'validation' && 'validation' || 'production' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -34,6 +43,7 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Prepare public release configuration
+        if: inputs.target != 'validation'
         env:
           RELEASE_CONFIG: ${{ vars.MOBILE_RELEASE_CONFIG_JSON }}
         run: |
@@ -52,6 +62,7 @@ jobs:
           JS
 
       - name: Validate release configuration
+        if: inputs.target != 'validation'
         run: flutter test test/config/deployment_configuration_test.dart --dart-define=VALIDATE_RELEASE_CONFIG=true --dart-define-from-file=.dart_tool/release-config.json
 
       - name: Analyze
@@ -61,7 +72,12 @@ jobs:
         run: flutter test
 
       - name: Build Flutter web
+        if: inputs.target != 'validation'
         run: flutter build web --release --no-wasm-dry-run --dart-define-from-file=.dart_tool/release-config.json
+
+      - name: Build validation artifact (not production)
+        if: inputs.target == 'validation'
+        run: flutter build web --debug --no-wasm-dry-run
 
       - name: Record source revision
         run: printf '%s\n' "$GITHUB_SHA" > build/web/REVISION.txt
@@ -69,7 +85,7 @@ jobs:
       - name: Upload Flutter web artifact
         uses: actions/upload-artifact@v6
         with:
-          name: dailycatch-web-${{ github.sha }}
+          name: dailycatch-web-${{ inputs.target == 'validation' && 'validation' || 'production' }}-${{ github.sha }}
           path: build/web
           if-no-files-found: error
           retention-days: 30
