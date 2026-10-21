@@ -59,6 +59,15 @@ jobs:
           config.DEMO_FALLBACKS_ENABLED = 'false';
           mkdirSync('.dart_tool', { recursive: true });
           writeFileSync('.dart_tool/release-config.json', JSON.stringify(config));
+          const firebaseConfig = {
+            apiKey: config.FIREBASE_API_KEY,
+            authDomain: config.FIREBASE_AUTH_DOMAIN,
+            projectId: config.FIREBASE_PROJECT_ID,
+            storageBucket: config.FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: config.FIREBASE_MESSAGING_SENDER_ID,
+            appId: config.FIREBASE_APP_ID
+          };
+          writeFileSync('web/firebase-config.json', JSON.stringify(firebaseConfig));
           JS
 
       - name: Validate release configuration
