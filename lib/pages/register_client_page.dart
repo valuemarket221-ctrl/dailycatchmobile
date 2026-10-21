@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/demo/demo_mode.dart';
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,7 +23,6 @@ class RegisterClientPage extends StatefulWidget {
 class _RegisterClientPageState extends State<RegisterClientPage> {
   static const _heroImage =
       'assets/images/ChatGPT Image 12 août 2026, 16_27_47.png';
-  static const _logoAsset = 'assets/images/logo.png';
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -179,13 +179,7 @@ class _RegisterClientPageState extends State<RegisterClientPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Image.asset(
-                          _logoAsset,
-                          width: 204,
-                          fit: BoxFit.contain,
-                          cacheWidth: 408,
-                          filterQuality: FilterQuality.high,
-                        ),
+                        const DailyCatchWordmark(),
                         const SizedBox(height: 16),
                         Text(
                           'Créer un compte',

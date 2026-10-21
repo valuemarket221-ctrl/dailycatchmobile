@@ -1,7 +1,7 @@
 import 'dart:ui' show Locale;
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/widgets.dart' show SizedBox;
+import 'package:flutter/widgets.dart' show ImageFiltered, Opacity, SizedBox;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myapp/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,9 +35,19 @@ void main() {
 
     await tester.pump();
 
-    expect(find.text('Moins de gaspillage,\nplus de fraîcheur.'), findsOneWidget);
+    expect(find.text('DailyCatch'), findsOneWidget);
+    final splashFilter = find.byType(ImageFiltered);
+    expect(tester.widget<ImageFiltered>(splashFilter).enabled, isTrue);
+    final splashOpacity = find.descendant(
+      of: splashFilter,
+      matching: find.byType(Opacity),
+    );
+    expect(tester.widget<Opacity>(splashOpacity).opacity, 0.25);
 
-    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 2200));
+    expect(tester.widget<ImageFiltered>(splashFilter).enabled, isFalse);
+    expect(tester.widget<Opacity>(splashOpacity).opacity, 1);
+    await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
     expect(

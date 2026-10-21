@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/demo/demo_mode.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +26,6 @@ class RegisterPartnerPage extends StatefulWidget {
 class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
   static const _heroImage =
       'assets/images/ChatGPT Image 12 août 2026, 16_27_47.png';
-  static const _logoAsset = 'assets/images/logo.png';
 
   int _currentStep = 0;
   bool _isLoading = false;
@@ -299,13 +299,7 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
                             child: _BackButton(onTap: _goBack),
                           ),
                           SizedBox(height: compact ? 2 : 8),
-                          Image.asset(
-                            _logoAsset,
-                            width: compact ? 154 : 190,
-                            fit: BoxFit.contain,
-                            cacheWidth: compact ? 308 : 380,
-                            filterQuality: FilterQuality.high,
-                          ),
+                          const DailyCatchWordmark(),
                           SizedBox(height: compact ? 6 : 12),
                           Text(
                             'Inscription vendeur',

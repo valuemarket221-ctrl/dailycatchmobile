@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/constants.dart';
@@ -19,7 +20,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   static const _heroImage =
       'assets/images/ChatGPT Image 12 août 2026, 16_27_47.png';
-  static const _logoAsset = 'assets/images/logo.png';
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -155,13 +155,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     child: Column(
                       children: [
-                        Image.asset(
-                          _logoAsset,
-                          width: 210,
-                          fit: BoxFit.contain,
-                          cacheWidth: 420,
-                          filterQuality: FilterQuality.high,
-                        ),
+                        const DailyCatchWordmark(),
                         const SizedBox(height: 12),
                         Text(
                           'Connexion',

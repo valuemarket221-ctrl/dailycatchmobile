@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:myapp/demo/demo_mode.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -2902,7 +2903,7 @@ class _PartnerBasketEditPageState extends State<PartnerBasketEditPage> {
                   width: double.infinity,
                   fit: BoxFit.cover,
                 ),
-              Image.asset('assets/images/logo.png', width: 82),
+              const DailyCatchWordmark(fontSize: 20),
             ],
           ),
         ),
