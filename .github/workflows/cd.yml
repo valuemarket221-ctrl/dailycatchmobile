@@ -16,12 +16,12 @@ concurrency:
 jobs:
   flutter-web:
     name: Flutter Web Artifact
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -67,7 +67,7 @@ jobs:
         run: printf '%s\n' "$GITHUB_SHA" > build/web/REVISION.txt
 
       - name: Upload Flutter web artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dailycatch-web-${{ github.sha }}
           path: build/web
