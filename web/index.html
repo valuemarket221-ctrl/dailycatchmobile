@@ -33,17 +33,18 @@
   <title>DailyCatch</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    body { margin: 0; background: #fff; }
-    #startup { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; color: #073e43; font: 16px Arial, sans-serif; }
+    body { margin: 0; background: #102446; }
+    #startup { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; color: white; font: 16px Arial, sans-serif; }
+    #startup[hidden] { display: none; }
     #startup h1 { font-size: 28px; }
     #startup button { padding: 12px 20px; border: 0; border-radius: 8px; background: #073e43; color: white; font: inherit; cursor: pointer; }
     #startup button[hidden] { display: none; }
   </style>
 </head>
 <body>
-  <div id="startup" role="status" aria-live="polite">
+  <div id="startup" role="status" aria-live="polite" hidden>
     <h1>DailyCatch</h1>
-    <p id="startup-message">Chargement en cours...</p>
+    <p id="startup-message"></p>
     <button id="startup-retry" type="button" hidden>R&eacute;essayer</button>
   </div>
   <script src="startup.js"></script>

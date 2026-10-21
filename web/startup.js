@@ -4,6 +4,7 @@
   const retry = document.getElementById('startup-retry');
   function showFailure() {
     if (rendered) return;
+    document.getElementById('startup').hidden = false;
     message.textContent = "Le chargement n'a pas abouti. Verifiez votre connexion puis reessayez.";
     retry.hidden = false;
   }

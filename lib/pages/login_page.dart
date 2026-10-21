@@ -114,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
             alignment: Alignment.bottomCenter,
             excludeFromSemantics: true,
           ),
-          const ColoredBox(color: Color(0xEFFFFFFF)),
+          const ColoredBox(color: Color(0x80081824)),
           SafeArea(
             child: LayoutBuilder(
               builder:
@@ -136,13 +136,13 @@ class _LoginPageState extends State<LoginPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const DailyCatchWordmark(),
+                                const DailyCatchWordmark(color: Colors.white),
                                 const SizedBox(height: 32),
                                 Text(
                                   'Connexion',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
-                                    color: AppColors.blueBic,
+                                    color: Colors.white,
                                     fontSize: 24,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0,
@@ -153,9 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                                   'Retrouvez vos paniers frais.',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
-                                    color: AppColors.blueBic.withValues(
-                                      alpha: 0.76,
-                                    ),
+                                    color: Colors.white,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -180,7 +178,7 @@ class _LoginPageState extends State<LoginPage> {
                                           ? null
                                           : () => context.go('/role-selection'),
                                   style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.blueBic,
+                                    foregroundColor: Colors.white,
                                     minimumSize: const Size(48, 48),
                                   ),
                                   child: const Text('Créer un compte'),
@@ -269,7 +267,7 @@ class _LoginPanel extends StatelessWidget {
                 child: Text(
                   'Mot de passe oublié ?',
                   style: GoogleFonts.poppins(
-                    color: AppColors.blueBic,
+                    color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
