@@ -8,12 +8,17 @@ on:
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   flutter-web:
     name: Flutter Web Artifact
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,17 +26,50 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.8'
           channel: stable
           cache: true
 
       - name: Install Flutter dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
+
+      - name: Prepare public release configuration
+        env:
+          RELEASE_CONFIG: ${{ vars.MOBILE_RELEASE_CONFIG_JSON }}
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          if (!process.env.RELEASE_CONFIG) throw new Error('Configure MOBILE_RELEASE_CONFIG_JSON before releasing');
+          const config = JSON.parse(process.env.RELEASE_CONFIG);
+          if (!config || Array.isArray(config) || typeof config !== 'object') throw new Error('Release configuration must be a JSON object');
+          const allowed = new Set(['API_BASE_URL', 'FIREBASE_API_KEY', 'FIREBASE_AUTH_DOMAIN', 'FIREBASE_PROJECT_ID', 'FIREBASE_STORAGE_BUCKET', 'FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_APP_ID', 'FIREBASE_WEB_VAPID_KEY', 'STRIPE_PUBLISHABLE_KEY', 'MAP_TILE_URL_TEMPLATE', 'MAP_TILE_USER_AGENT_PACKAGE_NAME', 'DEMO_FALLBACKS_ENABLED']);
+          for (const [key, value] of Object.entries(config)) {
+            if (!allowed.has(key) || typeof value !== 'string') throw new Error('Unsupported release configuration entry');
+          }
+          config.DEMO_FALLBACKS_ENABLED = 'false';
+          mkdirSync('.dart_tool', { recursive: true });
+          writeFileSync('.dart_tool/release-config.json', JSON.stringify(config));
+          JS
+
+      - name: Validate release configuration
+        run: flutter test test/config/deployment_configuration_test.dart --dart-define=VALIDATE_RELEASE_CONFIG=true --dart-define-from-file=.dart_tool/release-config.json
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
 
       - name: Build Flutter web
-        run: flutter build web --release --no-wasm-dry-run
+        run: flutter build web --release --no-wasm-dry-run --dart-define-from-file=.dart_tool/release-config.json
+
+      - name: Record source revision
+        run: printf '%s\n' "$GITHUB_SHA" > build/web/REVISION.txt
 
       - name: Upload Flutter web artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dailycatch-web
+          name: dailycatch-web-${{ github.sha }}
           path: build/web
+          if-no-files-found: error
+          retention-days: 30

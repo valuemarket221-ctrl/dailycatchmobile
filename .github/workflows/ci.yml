@@ -18,6 +18,7 @@ jobs:
   flutter:
     name: Flutter
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,20 +26,44 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.8'
           channel: stable
           cache: true
 
       - name: Install Flutter dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Analyze
         run: flutter analyze
 
       - name: Test
-        run: flutter test
+        run: flutter test --coverage
 
       - name: Build web debug
         run: flutter build web --debug --no-wasm-dry-run
 
       - name: Build Android debug
         run: flutter build apk --debug
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-coverage-${{ github.sha }}
+          path: coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload web validation build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-validation-${{ github.sha }}
+          path: build/web
+          if-no-files-found: error
+          retention-days: 7

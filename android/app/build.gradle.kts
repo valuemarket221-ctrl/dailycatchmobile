@@ -13,7 +13,14 @@ val isDemoBuild = (project.findProperty("dart-defines") as? String)
     ?.split(",")?.any {
         String(Base64.getDecoder().decode(it)) == "DEMO_MODE=true"
     } ?: false
-if (!isDemoBuild) apply(plugin = "com.google.gms.google-services")
+val hasFirebaseConfig = file("google-services.json").exists()
+if (!isDemoBuild && hasFirebaseConfig) apply(plugin = "com.google.gms.google-services")
+
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.contains("Release") } && !hasFirebaseConfig) {
+        throw GradleException("Release builds require android/app/google-services.json")
+    }
+}
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")

@@ -185,7 +185,7 @@ class PaymentApiService {
     final body = await _get('/api/v1/orders/me');
 
     try {
-      return _parse(
+      return await _parse(
         () =>
             BackendApiClient.requireObjectList(
               body,
