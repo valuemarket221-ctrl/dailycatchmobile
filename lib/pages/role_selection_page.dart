@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/auth_scroll_layout.dart';
 import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,72 +51,60 @@ class RoleSelectionPage extends StatelessWidget {
                 ),
                 const _TopWash(),
                 const _BottomWash(),
-                SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    media.padding.top + 34,
-                    24,
-                    media.padding.bottom + 18,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          media.size.height - media.padding.vertical - 56,
-                    ),
-                    child: Column(
-                      children: [
-                        const DailyCatchWordmark(),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Créer un compte',
-                          textAlign: TextAlign.center,
+                AuthScrollLayout(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const DailyCatchWordmark(),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Créer un compte',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      Text(
+                        'Choisissez votre profil DailyCatch.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic.withValues(alpha: 0.76),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 34),
+                      _RoleCard(
+                        title: 'Je veux sauver un panier',
+                        description: 'Réserver des paniers frais près de moi.',
+                        icon: Icons.shopping_bag_outlined,
+                        onTap: () => context.go('/register-client'),
+                      ),
+                      const SizedBox(height: 14),
+                      _RoleCard(
+                        title: 'Je suis vendeur',
+                        description:
+                            'Publier mes invendus et gérer mes retraits.',
+                        icon: Icons.storefront_outlined,
+                        onTap: () => context.go('/register-partner'),
+                      ),
+                      const SizedBox(height: 18),
+                      GestureDetector(
+                        onTap: () => context.go('/login'),
+                        child: Text(
+                          'J’ai déjà un compte',
                           style: GoogleFonts.poppins(
-                            color: AppColors.blueBic,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Text(
-                          'Choisissez votre profil DailyCatch.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: AppColors.blueBic.withValues(alpha: 0.76),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 34),
-                        _RoleCard(
-                          title: 'Je veux sauver un panier',
-                          description:
-                              'Réserver des paniers frais près de moi.',
-                          icon: Icons.shopping_bag_outlined,
-                          onTap: () => context.go('/register-client'),
-                        ),
-                        const SizedBox(height: 14),
-                        _RoleCard(
-                          title: 'Je suis vendeur',
-                          description:
-                              'Publier mes invendus et gérer mes retraits.',
-                          icon: Icons.storefront_outlined,
-                          onTap: () => context.go('/register-partner'),
-                        ),
-                        const SizedBox(height: 18),
-                        GestureDetector(
-                          onTap: () => context.go('/login'),
-                          child: Text(
-                            'J’ai déjà un compte',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

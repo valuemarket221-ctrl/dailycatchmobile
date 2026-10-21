@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/auth_scroll_layout.dart';
 import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/utils/navigation_utils.dart';
@@ -80,37 +81,26 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 ),
                 const _TopWash(),
                 const _BottomWash(),
-                SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    media.padding.top + 24,
-                    24,
-                    media.padding.bottom + 18,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          media.size.height - media.padding.vertical - 56,
-                    ),
-                    child: Column(
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _BackButton(onTap: () => safePop(context)),
-                        ),
-                        const SizedBox(height: 10),
-                        const DailyCatchWordmark(),
-                        const SizedBox(height: 24),
-                        _ResetPanel(
-                          emailController: _emailController,
-                          formKey: _formKey,
-                          isLoading: _isLoading,
-                          isSent: _isSent,
-                          onSubmit: _sendResetLink,
-                          onBackToLogin: () => context.go('/login'),
-                        ),
-                      ],
-                    ),
+                AuthScrollLayout(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _BackButton(onTap: () => safePop(context)),
+                      ),
+                      const SizedBox(height: 10),
+                      const DailyCatchWordmark(),
+                      const SizedBox(height: 24),
+                      _ResetPanel(
+                        emailController: _emailController,
+                        formKey: _formKey,
+                        isLoading: _isLoading,
+                        isSent: _isSent,
+                        onSubmit: _sendResetLink,
+                        onBackToLogin: () => context.go('/login'),
+                      ),
+                    ],
                   ),
                 ),
               ],

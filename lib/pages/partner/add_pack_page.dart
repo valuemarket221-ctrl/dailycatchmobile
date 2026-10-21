@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/responsive_form_row.dart';
 import 'package:myapp/services/partner_api_service.dart';
 import 'package:myapp/styles/app_theme.dart';
 import 'package:myapp/styles/text_styles.dart';
@@ -82,6 +83,7 @@ class _AddPackPageState extends State<AddPackPage> {
           ),
           Expanded(
             child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(24),
               child: _buildForm(),
             ),
@@ -107,7 +109,7 @@ class _AddPackPageState extends State<AddPackPage> {
           children: [
             Text('Informations du panier', style: AppTextStyles.headingS),
             const SizedBox(height: 24),
-            Row(
+            ResponsiveFormRow(
               children: [
                 Expanded(
                   child: _buildTextField(
@@ -159,7 +161,7 @@ class _AddPackPageState extends State<AddPackPage> {
             const SizedBox(height: 24),
             Text('Prix et disponibilités', style: AppTextStyles.headingS),
             const SizedBox(height: 16),
-            Row(
+            ResponsiveFormRow(
               children: [
                 Expanded(
                   child: _buildTextField(
@@ -194,8 +196,9 @@ class _AddPackPageState extends State<AddPackPage> {
             const SizedBox(height: 16),
             _buildDatePicker(),
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              runSpacing: 12,
               children: [
                 OutlinedButton(
                   onPressed: () => Navigator.pop(context),
@@ -295,12 +298,14 @@ class _AddPackPageState extends State<AddPackPage> {
           children: [
             const Icon(Icons.calendar_today, color: Colors.grey),
             const SizedBox(width: 12),
-            Text(
-              _expiryDate != null
-                  ? '${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}'
-                  : 'Sélectionner une date de retrait',
-              style: AppTextStyles.bodyM.copyWith(
-                color: _expiryDate != null ? Colors.black : Colors.grey[600],
+            Expanded(
+              child: Text(
+                _expiryDate != null
+                    ? '${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}'
+                    : 'Sélectionner une date de retrait',
+                style: AppTextStyles.bodyM.copyWith(
+                  color: _expiryDate != null ? Colors.black : Colors.grey[600],
+                ),
               ),
             ),
           ],

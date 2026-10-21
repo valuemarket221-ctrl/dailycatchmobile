@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/auth_scroll_layout.dart';
 import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/demo/demo_mode.dart';
@@ -228,6 +229,7 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
 
   void _continue() {
     if (_formKeys[_currentStep].currentState!.validate()) {
+      FocusScope.of(context).unfocus();
       if (_currentStep < 2) {
         setState(() => _currentStep++);
       } else {
@@ -239,6 +241,7 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final compact = media.size.height < 780;
     final maxWidth = media.size.shortestSide >= 600 ? 430.0 : double.infinity;
 
     return Scaffold(
@@ -277,140 +280,98 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
                 ),
                 const _TopWash(),
                 const _BottomWash(),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxHeight < 780;
-                    final horizontalPadding = compact ? 18.0 : 24.0;
-                    final topPadding = media.padding.top + (compact ? 10 : 18);
-                    final bottomPadding =
-                        media.padding.bottom + (compact ? 10 : 16);
-
-                    return Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        topPadding,
-                        horizontalPadding,
-                        bottomPadding,
+                AuthScrollLayout(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _BackButton(onTap: _goBack),
                       ),
-                      child: Column(
+                      SizedBox(height: compact ? 2 : 8),
+                      const DailyCatchWordmark(),
+                      SizedBox(height: compact ? 6 : 12),
+                      Text(
+                        'Inscription vendeur',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic,
+                          fontSize: compact ? 23 : 26,
+                          height: 1.08,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 2 : 4),
+                      Text(
+                        'Publiez vos paniers et gérez vos retraits.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic.withValues(alpha: 0.74),
+                          fontSize: compact ? 11.5 : 13,
+                          height: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 10 : 16),
+                      _StepProgress(currentStep: _currentStep),
+                      SizedBox(height: compact ? 10 : 14),
+                      _StepCard(
+                        compact: compact,
+                        child: _buildStepContent(compact: compact),
+                      ),
+                      SizedBox(height: compact ? 8 : 14),
+                      Row(
                         children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _BackButton(onTap: _goBack),
-                          ),
-                          SizedBox(height: compact ? 2 : 8),
-                          const DailyCatchWordmark(),
-                          SizedBox(height: compact ? 6 : 12),
-                          Text(
-                            'Inscription vendeur',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              color: AppColors.blueBic,
-                              fontSize: compact ? 23 : 26,
-                              height: 1.08,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0,
+                          if (_currentStep > 0)
+                            Expanded(
+                              child: SizedBox(
+                                height: compact ? 48 : 54,
+                                child: OutlinedButton(
+                                  onPressed: _goBack,
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.white),
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Retour',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          SizedBox(height: compact ? 2 : 4),
-                          Text(
-                            'Publiez vos paniers et gérez vos retraits.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              color: AppColors.blueBic.withValues(alpha: 0.74),
-                              fontSize: compact ? 11.5 : 13,
-                              height: 1.2,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(height: compact ? 10 : 16),
-                          _StepProgress(currentStep: _currentStep),
-                          SizedBox(height: compact ? 10 : 14),
+                          if (_currentStep > 0) const SizedBox(width: 12),
                           Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, area) {
-                                return SingleChildScrollView(
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  physics: const BouncingScrollPhysics(),
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minHeight: area.maxHeight,
-                                    ),
-                                    child: Align(
-                                      alignment: Alignment.topCenter,
-                                      child: _StepCard(
-                                        compact: compact,
-                                        child: _buildStepContent(
-                                          compact: compact,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          SizedBox(height: compact ? 8 : 14),
-                          Row(
-                            children: [
-                              if (_currentStep > 0)
-                                Expanded(
-                                  child: SizedBox(
-                                    height: compact ? 48 : 54,
-                                    child: OutlinedButton(
-                                      onPressed: _goBack,
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(
-                                          color: Colors.white,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        padding: EdgeInsets.zero,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Retour',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              if (_currentStep > 0) const SizedBox(width: 12),
-                              Expanded(
-                                child: ActionButton(
-                                  label:
-                                      _currentStep == 2
-                                          ? 'Envoyer'
-                                          : 'Continuer',
-                                  onPressed: _continue,
-                                  isLoading: _isLoading && _currentStep == 2,
-                                  isEnabled: !_isLoading,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: compact ? 8 : 12),
-                          GestureDetector(
-                            onTap: () => context.go('/login'),
-                            child: Text(
-                              'Déjà un compte ? Se connecter',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: compact ? 12 : 13,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            child: ActionButton(
+                              label:
+                                  _currentStep == 2 ? 'Envoyer' : 'Continuer',
+                              onPressed: _continue,
+                              isLoading: _isLoading && _currentStep == 2,
+                              isEnabled: !_isLoading,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                      SizedBox(height: compact ? 8 : 12),
+                      GestureDetector(
+                        onTap: () => context.go('/login'),
+                        child: Text(
+                          'Déjà un compte ? Se connecter',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: compact ? 12 : 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -533,6 +494,7 @@ class _RegisterPartnerPageState extends State<RegisterPartnerPage> {
             ),
             SizedBox(height: gap),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 hintText: 'Catégorie',
@@ -782,10 +744,7 @@ class _StepCard extends StatelessWidget {
           ),
         ],
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        child: KeyedSubtree(key: ValueKey(child.hashCode), child: child),
-      ),
+      child: child,
     );
   }
 }

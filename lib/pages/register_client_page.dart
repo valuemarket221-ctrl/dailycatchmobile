@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/demo/demo_mode.dart';
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/auth_scroll_layout.dart';
 import 'package:myapp/widgets/dailycatch_wordmark.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/utils/navigation_utils.dart';
@@ -154,86 +155,74 @@ class _RegisterClientPageState extends State<RegisterClientPage> {
                 ),
                 const _TopWash(),
                 const _BottomWash(),
-                SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    media.padding.top + 24,
-                    24,
-                    media.padding.bottom + 18,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          media.size.height - media.padding.vertical - 56,
-                    ),
-                    child: Column(
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _BackButton(
-                            onTap:
-                                () =>
-                                    context.canPop()
-                                        ? safePop(context)
-                                        : context.go('/role-selection'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const DailyCatchWordmark(),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Créer un compte',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: AppColors.blueBic,
-                            fontSize: 27,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        Text(
-                          'Réservez les meilleurs paniers frais près de vous.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: AppColors.blueBic.withValues(alpha: 0.74),
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        _ClientFormPanel(
-                          formKey: _formKey,
-                          nameController: _nameController,
-                          emailController: _emailController,
-                          phoneController: _phoneController,
-                          passwordController: _passwordController,
-                          obscureText: _obscureText,
-                          agreedToTerms: _agreedToTerms,
-                          isLoading: _isLoading,
-                          onTogglePassword:
+                AuthScrollLayout(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _BackButton(
+                          onTap:
                               () =>
-                                  setState(() => _obscureText = !_obscureText),
-                          onToggleTerms:
-                              () => setState(
-                                () => _agreedToTerms = !_agreedToTerms,
-                              ),
-                          onSubmit: _register,
+                                  context.canPop()
+                                      ? safePop(context)
+                                      : context.go('/role-selection'),
                         ),
-                        const SizedBox(height: 14),
-                        GestureDetector(
-                          onTap: () => context.go('/login'),
-                          child: Text(
-                            'Déjà un compte ? Se connecter',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                      ),
+                      const SizedBox(height: 8),
+                      const DailyCatchWordmark(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Créer un compte',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic,
+                          fontSize: 27,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      Text(
+                        'Réservez les meilleurs paniers frais près de vous.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.blueBic.withValues(alpha: 0.74),
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      _ClientFormPanel(
+                        formKey: _formKey,
+                        nameController: _nameController,
+                        emailController: _emailController,
+                        phoneController: _phoneController,
+                        passwordController: _passwordController,
+                        obscureText: _obscureText,
+                        agreedToTerms: _agreedToTerms,
+                        isLoading: _isLoading,
+                        onTogglePassword:
+                            () => setState(() => _obscureText = !_obscureText),
+                        onToggleTerms:
+                            () => setState(
+                              () => _agreedToTerms = !_agreedToTerms,
                             ),
+                        onSubmit: _register,
+                      ),
+                      const SizedBox(height: 14),
+                      GestureDetector(
+                        onTap: () => context.go('/login'),
+                        child: Text(
+                          'Déjà un compte ? Se connecter',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/widgets/auth_scroll_layout.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/utils/navigation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -84,85 +85,82 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
       ),
       body: Form(
         key: _formKey,
-        child: Column(
-          children: [
-            // Progress indicator
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  _buildProgressStep(0, 'Infos'),
-                  _buildProgressLine(0),
-                  _buildProgressStep(1, 'Boutique'),
-                  _buildProgressLine(1),
-                  _buildProgressStep(2, 'Compte'),
-                ],
+        child: AuthScrollLayout(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Progress indicator
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    _buildProgressStep(0, 'Infos'),
+                    _buildProgressLine(0),
+                    _buildProgressStep(1, 'Boutique'),
+                    _buildProgressLine(1),
+                    _buildProgressStep(2, 'Compte'),
+                  ],
+                ),
               ),
-            ),
-            // Step content
-            Expanded(
-              child: PageView(
-                controller: PageController(),
-                onPageChanged: (index) => setState(() => _currentStep = index),
-                children: [
-                  _buildStoreInfoStep(),
-                  _buildBusinessStep(),
-                  _buildAccountStep(),
-                ],
-              ),
-            ),
-            // Navigation buttons
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  if (_currentStep > 0)
+              // Step content
+              switch (_currentStep) {
+                0 => _buildStoreInfoStep(),
+                1 => _buildBusinessStep(),
+                _ => _buildAccountStep(),
+              },
+              // Navigation buttons
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    if (_currentStep > 0)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _previousStep,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(color: AppColors.blueBic),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Retour',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.blueBic,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_currentStep > 0) const SizedBox(width: 12),
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: _previousStep,
-                        style: OutlinedButton.styleFrom(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _currentStep < 2 ? _nextStep : _submitForm,
+                        style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: AppColors.blueBic),
+                          backgroundColor: AppColors.blueBic,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: Text(
-                          'Retour',
+                          _currentStep < 2 ? 'Suivant' : 'Soumettre',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.blueBic,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
-                  if (_currentStep > 0) const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _currentStep < 2 ? _nextStep : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: AppColors.blueBic,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        _currentStep < 2 ? 'Suivant' : 'Soumettre',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -216,7 +214,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
   }
 
   Widget _buildStoreInfoStep() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,7 +283,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
   }
 
   Widget _buildBusinessStep() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,7 +369,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
   }
 
   Widget _buildAccountStep() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
