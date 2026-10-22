@@ -568,6 +568,7 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: _selectedCategory,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.category, color: AppColors.blueBic),
@@ -582,7 +583,12 @@ class _PartnerRegistrationPageState extends State<PartnerRegistrationPage> {
               _categories.map((category) {
                 return DropdownMenuItem(
                   value: category,
-                  child: Text(category, style: GoogleFonts.poppins()),
+                  child: Text(
+                    category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(),
+                  ),
                 );
               }).toList(),
           onChanged: (value) => setState(() => _selectedCategory = value!),

@@ -57,6 +57,40 @@ void main() {
     'admin partner registration': const PartnerRegistrationPage(),
   };
   for (final entry in pages.entries) {
+    for (final size in [const Size(568, 320), const Size(320, 568)]) {
+      testWidgets('${entry.key}: large text and keyboard at $size', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        tester.view.viewInsets = const FakeViewPadding(bottom: 150);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpWidget(
+          MaterialApp(
+            builder:
+                (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: const TextScaler.linear(1.5)),
+                  child: child!,
+                ),
+            home: entry.value,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final fields = find.byType(TextFormField);
+        for (var index = 0; index < fields.evaluate().length; index++) {
+          await tester.ensureVisible(fields.at(index));
+          await tester.enterText(fields.at(index), 'test');
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
     testWidgets('${entry.key}: fields stay accessible with keyboard', (
       tester,
     ) async {
